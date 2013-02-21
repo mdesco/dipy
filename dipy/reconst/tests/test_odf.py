@@ -206,16 +206,17 @@ def test_sf_to_sh():
     assert_array_almost_equal(odf2d, odf2d_sf, 2)
 
 def test_deconv():
-    SNR = 30 #10, 20, None
+    SNR = None #10, 20, 30
     bvalue = 1000
     S0 = 1
     sh_order = 8
     visu = True
     
     # signal gtab
-    #sphere = unit_octahedron
+    #sphere = get_sphere('symmetric362')
+    sphere = unit_octahedron
+    sphere = sphere.subdivide(3)
     #sphere = sphere.subdivide(2)
-    sphere = get_sphere('symmetric362')
     s_bvecs = np.concatenate(([[0, 0, 0]], sphere.vertices))
     s_bvals = np.zeros(len(s_bvecs)) + bvalue
     s_bvals[0] = 0
@@ -423,7 +424,8 @@ def test_b() :
     # this values come from mrtrix
     r_rh = np.array( [1.7450, -0.6124, 0.2205, -0.0657, 0.01622] )
     b = np.array( [0.5731, -1.6329, 4.5345, -15.2235, 61.6530 ] )    
-    fodf_sh,b_bis = usdeconv(r_rh, r_rh, 8)
+    s_sh = np.zeros( (45) )
+    fodf_sh,b_bis = sdeconv(r_rh, s_sh, 8, False)
     k = np.array( [0, 3, 10, 21, 36] )
     assert_array_almost_equal(b, b_bis[k], 2 )
     
@@ -472,17 +474,12 @@ def gen_dirac( pol, azi, sh_order ) :
     return dirac
 
 def test_gen_dirac() :
-    dirac = np.array([0.2821, 0, 0, 0.6308, 0, 0, 0, 0, 0, 0, 0.8463, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0171, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.1631, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    dirac = np.array([0.2821, 0, 0, 0.6308, 0, 0, 0, 0, 0, 0, 0.8463, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0171, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.1631, 0, 0, 0, 0, 0, 0, 0, 0])
     # as from mrtrix 
+    dirac2 = gen_dirac(0, 0, 8)
+    assert_array_almost_equal(dirac, dirac2, 2 )
 
-    assert_array_almost_equal(dirac, gen_dirac(0, 0, 8), 2 )
-    
-
-# TO DO: write a test for the sh_to_rh() function
-#def test_sh_to_rh() :
-    
-
-    
+        
 def sf_to_sh2(sf, sphere, sh_order=4, basis_type=None, smooth=0.0):
     """ Spherical function to spherical harmonics (SH)
     
@@ -536,8 +533,8 @@ def sf_to_sh2(sf, sphere, sh_order=4, basis_type=None, smooth=0.0):
 
 
 
-#test_gen_dirac()
-#test_b()
+test_gen_dirac()
+test_b()
 test_deconv()
 
 
