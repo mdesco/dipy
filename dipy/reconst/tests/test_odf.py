@@ -3,7 +3,7 @@ from numpy.testing import assert_array_equal, assert_array_almost_equal
 from dipy.reconst.odf import (OdfFit, OdfModel, gfa, peaks_from_model, peak_directions,
                               peak_directions_nl)
 from dipy.core.subdivide_octahedron import create_unit_hemisphere
-from dipy.core.sphere import unit_icosahedron, unit_octahedron
+from dipy.core.sphere import unit_icosahedron, unit_octahedron, Sphere
 from nose.tools import (assert_almost_equal, assert_equal, assert_raises,
                         assert_true)
 from dipy.reconst.shm import (sph_harm_ind_list, sph_harm_lookup, smooth_pinv,
@@ -12,6 +12,7 @@ from dipy.data import get_sphere
 from dipy.sims.voxel import (single_tensor, single_tensor_odf,
                             multi_tensor, multi_tensor_odf)
 from dipy.core.gradients import gradient_table
+from scipy.special import lpn
 
 
 
@@ -213,10 +214,8 @@ def test_deconv():
     visu = True
     
     # signal gtab
-    #sphere = get_sphere('symmetric362')
-    sphere = unit_octahedron
+    sphere = get_sphere('symmetric362')
     sphere = sphere.subdivide(3)
-    #sphere = sphere.subdivide(2)
     s_bvecs = np.concatenate(([[0, 0, 0]], sphere.vertices))
     s_bvals = np.zeros(len(s_bvecs)) + bvalue
     s_bvals[0] = 0
@@ -277,7 +276,6 @@ def test_deconv():
     fodf_sh,num_it = csdeconv( r_rh, s_sh, sh_order, B_regul, 1.0, 0.1 )
     fodf = sh_to_sf(fodf_sh, psphere, sh_order)
     print 'converged after %d iterations'%num_it
-    visu = True
     if visu :
         odf_gt = multi_tensor_odf( psphere.vertices, [0.5, 0.5], s_mevals, s_mevecs )
         from dipy.viz import fvtk
@@ -285,23 +283,94 @@ def test_deconv():
         fvtk.add( r, fvtk.sphere_funcs( np.vstack((odf_gt, fodf)), psphere ) )
         fvtk.show( r )
 
-    #fodf_sh,num_it = csdeconv( r_rh, s_sh, sh_order, B_regul, 1.0, 0.1 )
-    #fodf = sh_to_sf(fodf_sh, psphere, sh_order)
+    # building forward spherical convolution matrix
+    b = np.zeros( (r_sh.shape) )
+    bb = np.zeros( (r_sh.shape) )
+    i = 0
+    for l in np.arange(0,sh_order+1,2) :
+        for m in np.arange(-l,l+1) :
+            b[i] = r_rh[l/2]
+            i = i + 1
+    R = np.diag( b )
+
+    # build the spherical deconvolution transform (SDT) matrix 
+    i = 0
+    num = 1000
+    delta = 1.0/num
+    e1 = 13.9
+    e2 = 3.55
+    ratio = e2/e1
+    r = np.zeros( (r_rh.shape) )
+    frt = np.zeros( (r_rh.shape) )
+
+    for l in np.arange(0,sh_order+1,2) :
+        sharp = 0.0
+        integral = 0.0
+        
+        # Trapezoidal integration
+        # 1/2 [ f(x0) + 2f(x1) + ... + 2f(x{n-1}) + f(xn) ] delta
+        for z in np.linspace(-1, 1, num) :
+            if z == -1 or z == 1  :
+                sharp += lpn(l, z)[0][-1] * np.sqrt(1 / (1 - (1 - ratio) * z * z))
+                integral += np.sqrt(1/(1 - (1 - ratio) * z * z))                    
+            else  :
+                sharp += 2 * lpn(l, z)[0][-1] * np.sqrt( 1 / (1 - (1 - ratio) * z * z))
+                integral += 2 * np.sqrt(1/(1 - (1 - ratio) * z * z))
+                
+        integral /= 2
+        integral *= delta
+        sharp /= 2
+        sharp *= delta
+        sharp /= integral
+
+        r[l/2] = 2 * np.pi * lpn(l, 0)[0][-1] / sharp
+        frt[l/2] = 2 * np.pi * lpn(l, 0)[0][-1] 
+        
+    r_bis = np.array([6.283, -36.829, 148.088, -537.100, 1828.486])
+    assert_array_almost_equal(r, r_bis, 0)
+        
+    i = 0
+    for l in np.arange(0,sh_order+1,2) :
+        for m in np.arange(-l,l+1) :
+            b[i] = r[l/2]
+            bb[i] = frt[l/2]
+            i = i + 1
+    P = np.diag( b )
+    P_frt = np.diag( bb )
+    
+    fodf_sh,num_it = odf_csdeconv( r_sh, s_sh, sh_order, R, P, B_regul, 1, 0.1 )
+    fodf = sh_to_sf(fodf_sh, psphere, sh_order)
+    print 'converged after %d iterations'%num_it
+    visu=True
+    if visu :
+        odf_gt = multi_tensor_odf( psphere.vertices, [0.5, 0.5], s_mevals, s_mevecs )
+        from dipy.viz import fvtk
+        r = fvtk.ren()
+        fvtk.add( r, fvtk.sphere_funcs( np.vstack((odf_gt, fodf)), psphere ) )
+        fvtk.show( r )
 
 
-def odf_csdeconv( r_sh, s_sh, sh_order, B_regul, Lambda, tau ) :
-    """ ODF constrained-regularized sherical deconvolution 
+# s_sh should be odf_sh
+def odf_csdeconv( r_rh, s_sh, sh_order, R, P, B_regul, Lambda, tau ) :
+    """ ODF constrained-regularized sherical deconvolution
+
+       Also called the spherical deconvolution transform (SDT)
 
     Parameters
     ----------
-    r_sh : ndarray
-         ndarray of SH coefficients for the single fiber response function
+    r_rh : ndarray
+         ndarray of rotational harmonics coefficients
+         for the single fiber response function
     s_sh : ndarray
          ndarray of SH coefficients for the spherical function to be deconvolved
     sh_order : int
          maximal SH order of the SH representation
     B_regul : ndarray
          SH basis matrix used for deconvolution
+    R : ndarray
+         Single fiber response function SH matrix
+    P : ndarray
+         SDT matrix in SH basis
     Lambda : float
          lambda parameter in minimization equation (default 1.0)
     tau : float
@@ -320,28 +389,24 @@ def odf_csdeconv( r_sh, s_sh, sh_order, B_regul, Lambda, tau ) :
     """
     m, n = sph_harm_ind_list(sh_order)
 
-    # building forward spherical deconvolution matrix
-    b = np.zeros( (m.shape) )
-    i = 0
-    for l in np.arange(0,sh_order+1,2) :
-        for m in np.arange(-l,l+1) :
-            b[i] = r_rh[l/2]                
-            i = i + 1
-    R = np.diag( b )
-
-    # generate initial fODF estimate, truncated at SH order 4
-    fodf_sh = np.linalg.lstsq(R, s_sh)[0]  # a\b
-    fodf_sh[15:] = 0    
+    # Generate initial fODF estimate, which is the ODF truncated at SH order 4
+    fodf_sh = np.dot( P, s_sh)
+    fodf_sh[15:] = 0
+    print fodf_sh
     
+    psphere = get_sphere('symmetric362')
+    fodf = sh_to_sf(fodf_sh, psphere, sh_order)
+    from dipy.viz import fvtk
+    r = fvtk.ren()
+    fvtk.add(r, fvtk.sphere_funcs(fodf, psphere))
+    fvtk.show( r )
+
     #set threshold on FOD amplitude used to identify 'negative' values
-    threshold = tau*np.mean(np.dot(B_regul, fodf_sh));
-    
-    # scale lambda to account for differences in the number of 
-    # SH coefficients and number of mapped directions
-    Lambda = Lambda * R.shape[0] * r_rh[0] / B_regul.shape[0]
-    if sh_order == 8 :
-        assert_almost_equal(Lambda, 0.822627111014, 4) # as in mrtrix
+    threshold = tau
 
+    #Lambda = Lambda * R.shape[0] * r_rh[0] / B_regul.shape[0]
+    #print Lambda
+    
     k = []
     convergence = 50
     for num_it in np.arange(1,convergence+1) :
@@ -410,10 +475,17 @@ def csdeconv( r_rh, s_sh, sh_order, B_regul, Lambda, tau ) :
     R = np.diag( b )
 
     # generate initial fODF estimate, truncated at SH order 4
-    fodf_sh = np.linalg.lstsq(R, s_sh)[0]  # a\b
+    fodf_sh = np.linalg.lstsq(R, s_sh)[0]  # R\sh_sh
     fodf_sh[15:] = 0    
+    psphere = get_sphere('symmetric362')
+    fodf = sh_to_sf(fodf_sh, psphere, sh_order)
+    from dipy.viz import fvtk
+    r = fvtk.ren()
+    fvtk.add(r, fvtk.sphere_funcs(fodf, psphere))
+    fvtk.show( r )
+
     
-    #set threshold on FOD amplitude used to identify 'negative' values
+    #set threshold on fODF amplitude used to identify 'negative' values
     threshold = tau*np.mean(np.dot(B_regul, fodf_sh));
     
     # scale lambda to account for differences in the number of 
@@ -613,8 +685,8 @@ def sf_to_sh2(sf, sphere, sh_order=4, basis_type=None, smooth=0.0):
 
 
 
-test_gen_dirac()
-test_b()
+#test_gen_dirac()
+#test_b()
 test_deconv()
 
 
