@@ -84,7 +84,7 @@ def test_multi_tensor():
 
     S, sticks = MultiTensor(gtab, mevals, S0=100, angles=[(90, 45), (45, 90)],
                             fractions=[50, 50], snr=None)
-
+    
     assert_array_almost_equal(S, Ssingle)
 
 
