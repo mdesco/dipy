@@ -8,7 +8,7 @@ from nose.tools import (assert_almost_equal, assert_equal, assert_raises,
                         assert_true)
 from dipy.reconst.shm import (sph_harm_ind_list, sph_harm_lookup, smooth_pinv,
                               real_sph_harm, sh_to_sf, sf_to_sh)
-from dipy.data import get_sphere
+from dipy.data import get_sphere, get_data
 from dipy.sims.voxel import (single_tensor, single_tensor_odf,
                             multi_tensor, multi_tensor_odf)
 from dipy.core.gradients import gradient_table
@@ -207,54 +207,76 @@ def test_sf_to_sh():
     assert_array_almost_equal(odf2d, odf2d_sf, 2)
 
 def test_deconv():
-    SNR = 10 #None #10, 20, 30
+    SNR = 30 #None #10, 20, 30
     bvalue = 1000
     S0 = 1
     sh_order = 8
     visu = False
+    generate = True
+
+    _, fbvals, fbvecs = get_data('small_64D')
+    bvals = np.load(fbvals)
+    bvecs = np.load(fbvecs)
+    sphere = Sphere(xyz=np.vstack((bvecs[1:],-bvecs[1:])))
+
+    #sphere = unit_octahedron
+    #sphere = sphere.subdivide(3)
+    print sphere.vertices.shape
     
-    # signal gtab
-    sphere = get_sphere('symmetric362')
-    sphere = sphere.subdivide(3)
-    s_bvecs = np.concatenate(([[0, 0, 0]], sphere.vertices))
-    s_bvals = np.zeros(len(s_bvecs)) + bvalue
-    s_bvals[0] = 0
-    s_gtab = gradient_table(s_bvals, s_bvecs)    
-    s_mevals = np.array(([0.0015, 0.0003, 0.0003], [0.0015, 0.0003, 0.0003] ))
-    s_mevecs = [ np.array( [ [1,0,0], [0,1,0], [0,0,1] ] ),
-               np.array( [ [0,0,1], [0,1,0], [1,0,0] ] ) ]
-    S,sticks = multi_tensor( s_gtab, s_mevals, S0, angles=[(0, 0), (90, 0)],
-                               fractions=[50, 50], snr=SNR )
-    odf_gt = multi_tensor_odf( sphere.vertices, [0.5, 0.5], s_mevals, s_mevecs )
-
-    if visu :
-        from dipy.viz import fvtk
-        r = fvtk.ren()
-        fvtk.add( r, fvtk.sphere_funcs( np.vstack((S[1:], odf_gt)), sphere ) )
-        fvtk.show( r )
-
-    print 'Done simulating signal...'    
-    # single fiber response function gtab on a sphere of 362 points
     psphere = get_sphere('symmetric362')
-    r_bvecs = np.concatenate(([[0, 0, 0]], psphere.vertices))
-    r_bvals = np.zeros(len(r_bvecs)) + bvalue
-    r_bvals[0] = 0
-    r_gtab = gradient_table(r_bvals, r_bvecs)
-    R = single_tensor( r_gtab, S0, s_mevals[1], s_mevecs[1], snr=None )
-    r_odf = single_tensor_odf( psphere.vertices, s_mevals[1], s_mevecs[1] )
-    print 'Done simulating response function...'
     
-    if visu :
-        from dipy.viz import fvtk
-        r = fvtk.ren()
-        fvtk.add( r, fvtk.sphere_funcs( np.vstack((R[1:], r_odf)), psphere ) )
-        fvtk.show( r )
+    if generate : 
 
-    s_sh,B_dwi   = sf_to_sh2( S[1:], sphere, sh_order )
-    r_sh,B_regul = sf_to_sh2( R[1:], psphere, sh_order )
-    r_rh         = sh_to_rh( r_sh, sh_order )
-    print 'Done computing reconstruction matrices...'
+        s_bvecs = np.concatenate(([[0, 0, 0]], sphere.vertices))
+        s_bvals = np.zeros(len(s_bvecs)) + bvalue
+        s_bvals[0] = 0
+        s_gtab = gradient_table(s_bvals, s_bvecs)    
+        s_mevals = np.array(([0.0015, 0.0003, 0.0003], [0.0015, 0.0003, 0.0003] ))
+        s_mevecs = [ np.array( [ [1,0,0], [0,1,0], [0,0,1] ] ),
+                     np.array( [ [0,0,1], [0,1,0], [1,0,0] ] ) ]
+        S,sticks = multi_tensor( s_gtab, s_mevals, S0, angles=[(0, 0), (90, 0)],
+                                 fractions=[50, 50], snr=SNR )
+        odf_gt = multi_tensor_odf( sphere.vertices, [0.5, 0.5], s_mevals, s_mevecs )
 
+        if visu :
+            from dipy.viz import fvtk
+            r = fvtk.ren()
+            fvtk.add( r, fvtk.sphere_funcs( np.vstack((S[1:], odf_gt)), sphere ) )
+            fvtk.show( r )
+
+        print 'Done simulating signal...'    
+        # single fiber response function gtab on a sphere of 362 points
+        
+        r_bvecs = np.concatenate(([[0, 0, 0]], psphere.vertices))
+        r_bvals = np.zeros(len(r_bvecs)) + bvalue
+        r_bvals[0] = 0
+        r_gtab = gradient_table(r_bvals, r_bvecs)
+        R = single_tensor( r_gtab, S0, s_mevals[1], s_mevecs[1], snr=None )
+        r_odf = single_tensor_odf( psphere.vertices, s_mevals[1], s_mevecs[1] )
+        print 'Done simulating response function...'
+            
+        if visu :
+            from dipy.viz import fvtk
+            r = fvtk.ren()
+            fvtk.add( r, fvtk.sphere_funcs( np.vstack((R[1:], r_odf)), psphere ) )
+            fvtk.show( r )
+            
+        s_sh,B_dwi   = sf_to_sh2( S[1:], sphere, sh_order )
+        r_sh,B_regul = sf_to_sh2( R[1:], psphere, sh_order )
+        r_rh         = sh_to_rh( r_sh, sh_order )
+        print 'Done computing reconstruction matrices...'
+                
+        np.savez('stuff_snr05.npz', B_dwi=B_dwi, B_regul=B_regul, s_sh=s_sh, r_sh=r_sh, r_rh=r_rh)
+    else :
+        npz = np.load('stuff_snr10.npz')
+        print npz.files
+        B_dwi = npz['B_dwi']
+        B_regul = npz['B_regul']
+        s_sh = npz['s_sh']
+        r_sh = npz['r_sh']
+        r_rh = npz['r_rh']
+
+                
 #     u_fodf_sh,b = sdeconv( r_rh, s_sh, sh_order, False )
 #     u_fodf = sh_to_sf(u_fodf_sh, psphere, sh_order)
 
@@ -353,27 +375,31 @@ def test_deconv():
 #    print np.dot(P_sdt, P_sdt_inv)
     
     odf_sh = np.dot( P_frt, s_sh )
-#     qball_odf = sh_to_sf(odf_sh, psphere, sh_order)
+    qball_odf = sh_to_sf(odf_sh, psphere, sh_order)
+    Z = np.linalg.norm(qball_odf)
+    odf_sh /= Z
+
+    signal = sh_to_sf(s_sh, psphere, sh_order)
+        
+    #     fodf_sh = np.dot( P, s_sh )
+    #     fodf = sh_to_sf(fodf_sh, psphere, sh_order)
     
-#     fodf_sh = np.dot( P, s_sh )
-#     fodf = sh_to_sf(fodf_sh, psphere, sh_order)
-
-#     fodf_sh2 = np.dot( P_sdt, odf_sh )
-#     fodf2 = sh_to_sf(fodf_sh, psphere, sh_order)
-
-#     fodf_sh3 = np.linalg.lstsq(P_sdt_inv, odf_sh)[0]  
-#     fodf3 = sh_to_sf(fodf_sh3, psphere, sh_order)
-
-#     odf_sh2 = np.dot( P_sdt_inv, fodf_sh2 )
-#     odf2 = sh_to_sf(odf_sh2, psphere, sh_order)
-
-#     odf_sh3 = np.dot( P_sdt_inv, fodf_sh )
-#     odf3 = sh_to_sf(odf_sh2, psphere, sh_order)
-
+    #     fodf_sh2 = np.dot( P_sdt, odf_sh )
+    #     fodf2 = sh_to_sf(fodf_sh, psphere, sh_order)
+    
+    #     fodf_sh3 = np.linalg.lstsq(P_sdt_inv, odf_sh)[0]  
+    #     fodf3 = sh_to_sf(fodf_sh3, psphere, sh_order)
+    
+    #     odf_sh2 = np.dot( P_sdt_inv, fodf_sh2 )
+    #     odf2 = sh_to_sf(odf_sh2, psphere, sh_order)
+    
+    #     odf_sh3 = np.dot( P_sdt_inv, fodf_sh )
+    #     odf3 = sh_to_sf(odf_sh2, psphere, sh_order)
+    
     if visu :
         from dipy.viz import fvtk
         r = fvtk.ren()
-        fvtk.add( r, fvtk.sphere_funcs( np.vstack((fodf3, odf2, fodf2, odf3)), psphere ) )
+        fvtk.add( r, fvtk.sphere_funcs( np.vstack((qball_odf, signal)), psphere ) )
         fvtk.show( r )
 
     fodf_sh,num_it = csdeconv( r_rh, s_sh, sh_order, B_regul, 1.0, 0.1 )
@@ -385,13 +411,12 @@ def test_deconv():
     print 'CSD-ODF converged after %d iterations'%num_it
 
     # odf_sh should be normalized
-    fodf_csd_sh,num_it = odf_deconv( odf_sh, sh_order, P_sdt_inv, B_regul, 1, 0.1 )
+    fodf_csd_sh,num_it = odf_deconv( odf_sh, sh_order, P_sdt_inv, B_regul, 1, 0.025 )
     fodf_sdt = sh_to_sf(fodf_csd_sh, psphere, sh_order)
     print 'SDT CSD converged after %d iterations'%num_it
     
     visu = True
     if visu :
-        odf_gt = multi_tensor_odf( psphere.vertices, [0.5, 0.5], s_mevals, s_mevecs )
         from dipy.viz import fvtk
         r = fvtk.ren()
         fvtk.add( r, fvtk.sphere_funcs( np.vstack((fodf_csd, fodf_csd_odf, fodf_sdt)), psphere ) )
@@ -431,29 +456,21 @@ def odf_deconv( odf_sh, sh_order, P_sdt_inv, B_regul, Lambda, tau ) :
 
     # Generate initial fODF estimate, which is the ODF truncated at SH order 4
     fodf_sh = np.linalg.lstsq(P_sdt_inv, odf_sh)[0]  
-    #fodf_sh = np.dot( P_sdt, odf_sh)
     fodf_sh[15:] = 0
 
-    #set threshold on FOD amplitude used to identify 'negative' values
-    #threshold = tau
     fodf = np.dot(B_regul,fodf_sh)
-    #print np.mean(fodf),np.linalg.norm(fodf),np.min(fodf),np.max(fodf)
     Z = np.linalg.norm(fodf)
     fodf_sh /= Z
-#     psphere = get_sphere('symmetric362')
-#     fodf = sh_to_sf(fodf_sh, psphere, sh_order)   
-#     from dipy.viz import fvtk
-#     r = fvtk.ren()
-#     fvtk.add( r, fvtk.sphere_funcs( fodf, psphere ) )
-#     fvtk.show( r )
+
+    # tau should be more or less around 0.025 from my experience
+    # a good heuristic choice is just the mean of the fodf on the sphere. 
+    threshold=tau
+    #print np.mean(np.dot(B_regul, fodf_sh))
+    threshold = np.mean(np.dot(B_regul, fodf_sh))
     
-    threshold = tau*np.mean(np.dot(B_regul, fodf_sh));
-    Lambda = 1.5
     Lambda = Lambda * P_sdt_inv.shape[0] * P_sdt_inv[0,0] / B_regul.shape[0]
     
-    print Lambda,threshold
-
-    Lambda = 0.08
+    #print Lambda,threshold
     
     k = []
     convergence = 50
@@ -473,12 +490,6 @@ def odf_deconv( odf_sh, sh_order, P_sdt_inv, B_regul, Lambda, tau ) :
         M = np.concatenate( (P_sdt_inv, Lambda*B_regul[k, :] ) )
         ODF = np.concatenate( (odf_sh, np.zeros( k.shape ) ) )
         fodf_sh = np.linalg.lstsq(M, ODF)[0]  # M\ODF        
-#         fodf = sh_to_sf(fodf_sh, psphere, sh_order)
-#         from dipy.viz import fvtk
-#         r = fvtk.ren()
-#         fvtk.add( r, fvtk.sphere_funcs( fodf, psphere ) )
-#         fvtk.show( r )
-
         
     print 'maximum number of iterations exceeded - failed to converge';
     return fodf_sh,num_it
