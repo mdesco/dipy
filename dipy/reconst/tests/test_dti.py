@@ -37,8 +37,13 @@ def test_TensorModel():
 
     # Check that the multivoxel case works:
     dtifit = dm.fit(data)
+    # And smoke-test that all these operations return sensibly-shaped arrays:
     assert_equal(dtifit.fa.shape, data.shape[:3])
-
+    assert_equal(dtifit.ad.shape, data.shape[:3])
+    assert_equal(dtifit.md.shape, data.shape[:3])
+    assert_equal(dtifit.rd.shape, data.shape[:3])
+    assert_equal(dtifit.trace.shape, data.shape[:3])
+    
     # Make some synthetic data
     b0 = 1000.
     bvecs, bvals = read_bvec_file(get_data('55dir_grad.bvec'))
@@ -117,6 +122,9 @@ def test_tensor_scalar_attributes():
     D = np.array([[1., 1., 0], [1., 1., 0], [0, 0, 1.]])
     FA = np.sqrt(1./2*(1+4+1)/(1+4+0)) # 0.7745966692414834
     MD = 1.
+    RD = 0.5
+    AD = 2.0
+    trace = 3
 
     ### CALCULATE ESTIMATE VALUES ###
     dummy_data = np.ones((1,10)) #single voxel
@@ -132,6 +140,10 @@ def test_tensor_scalar_attributes():
     assert_array_almost_equal(D, tensor[0].D, err_msg = "Recovery of self diffusion tensor from eig not adaquate")
     assert_almost_equal(FA, tensor.fa(), msg = "Calculation of FA of self diffusion tensor is not adequate")
     assert_almost_equal(MD, tensor.md(), msg = "Calculation of MD of self diffusion tensor is not adequate")
+    assert_almost_equal(AD, tensor.ad, msg = "Calculation of AD of self diffusion tensor is not adequate")
+    assert_almost_equal(RD, tensor.rd, msg = "Calculation of RD of self diffusion tensor is not adequate")
+    assert_almost_equal(trace, tensor.trace, msg = "Calculation of trace of self diffusion tensor is not adequate")
+
     assert_equal(True, tensor.mask.all())
 
     #assert_equal(m_list.shape, n_list.shape)
