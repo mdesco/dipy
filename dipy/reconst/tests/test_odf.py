@@ -13,8 +13,11 @@ from dipy.sims.voxel import (single_tensor, single_tensor_odf,
                             multi_tensor, multi_tensor_odf)
 from dipy.core.gradients import gradient_table
 from scipy.special import lpn
-
-
+from dipy.reconst.shm import (sph_harm_ind_list, 
+                              real_sph_harm, 
+                              lazy_index,
+                              sh_to_sf)
+from dipy.core.geometry import cart2sphere
 
 def test_peak_directions_nl():
     def discrete_eval(sphere):
@@ -207,74 +210,75 @@ def test_sf_to_sh():
     assert_array_almost_equal(odf2d, odf2d_sf, 2)
 
 def test_deconv():
-    SNR = 30 #None #10, 20, 30
+    SNR = 20 #None #10, 20, 30
     bvalue = 1000
     S0 = 1
     sh_order = 8
     visu = False
     generate = True
 
+
+    from dipy.data import get_data
     _, fbvals, fbvecs = get_data('small_64D')
+
+
     bvals = np.load(fbvals)
     bvecs = np.load(fbvecs)
-    sphere = Sphere(xyz=np.vstack((bvecs[1:],-bvecs[1:])))
 
-    #sphere = unit_octahedron
-    #sphere = sphere.subdivide(3)
-    print sphere.vertices.shape
+    gtab = gradient_table(bvals, bvecs)
+    mevals = np.array(([0.0015, 0.0003, 0.0003], [0.0015, 0.0003, 0.0003]))
+    mevecs = [np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]]),
+              np.array([[0, 0, 1], [0, 1, 0], [1, 0, 0]])]
+
+    m, n = sph_harm_ind_list(sh_order)
+    where_b0s = lazy_index(gtab.b0s_mask)
+    where_dwi = lazy_index(~gtab.b0s_mask)
+    x, y, z = gtab.gradients[where_dwi].T
+    r, pol, azi = cart2sphere(x, y, z)
+    B_dwi = real_sph_harm(m, n, azi[:, None], pol[:, None])
+
     
-    psphere = get_sphere('symmetric362')
+    S, sticks = multi_tensor(gtab, mevals, S0, angles=[(0, 0), (90, 0)],
+                             fractions=[50, 50], snr=SNR)
+
+    psphere = get_sphere('symmetric362')    
+    odf_gt = multi_tensor_odf(psphere.vertices, [0.5, 0.5], mevals, mevecs)
+
+    r_bvecs = np.concatenate(([[0, 0, 0]], psphere.vertices))
+    r_bvals = np.zeros(len(r_bvecs)) + bvalue
+    r_bvals[0] = 0
+    r_gtab = gradient_table(r_bvals, r_bvecs)
+    R = single_tensor( r_gtab, S0, mevals[1], mevecs[1], snr=None )
+
+    s_sh   = np.linalg.lstsq(B_dwi, S[1:])[0]
+    r_sh,B_regul = sf_to_sh2( R[1:], psphere, sh_order )
+    r_rh         = sh_to_rh( r_sh, sh_order )
+
     
-    if generate : 
-
-        s_bvecs = np.concatenate(([[0, 0, 0]], sphere.vertices))
-        s_bvals = np.zeros(len(s_bvecs)) + bvalue
-        s_bvals[0] = 0
-        s_gtab = gradient_table(s_bvals, s_bvecs)    
-        s_mevals = np.array(([0.0015, 0.0003, 0.0003], [0.0015, 0.0003, 0.0003] ))
-        s_mevecs = [ np.array( [ [1,0,0], [0,1,0], [0,0,1] ] ),
-                     np.array( [ [0,0,1], [0,1,0], [1,0,0] ] ) ]
-        S,sticks = multi_tensor( s_gtab, s_mevals, S0, angles=[(0, 0), (90, 0)],
-                                 fractions=[50, 50], snr=SNR )
-        odf_gt = multi_tensor_odf( sphere.vertices, [0.5, 0.5], s_mevals, s_mevecs )
-
-        if visu :
-            from dipy.viz import fvtk
-            r = fvtk.ren()
-            fvtk.add( r, fvtk.sphere_funcs( np.vstack((S[1:], odf_gt)), sphere ) )
-            fvtk.show( r )
-
-        print 'Done simulating signal...'    
-        # single fiber response function gtab on a sphere of 362 points
+#     if generate : 
+#         print 'Done simulating signal...'    
+#         # single fiber response function gtab on a sphere of 362 points
         
-        r_bvecs = np.concatenate(([[0, 0, 0]], psphere.vertices))
-        r_bvals = np.zeros(len(r_bvecs)) + bvalue
-        r_bvals[0] = 0
-        r_gtab = gradient_table(r_bvals, r_bvecs)
-        R = single_tensor( r_gtab, S0, s_mevals[1], s_mevecs[1], snr=None )
-        r_odf = single_tensor_odf( psphere.vertices, s_mevals[1], s_mevecs[1] )
-        print 'Done simulating response function...'
+
+#         R = single_tensor( r_gtab, S0, s_mevals[1], s_mevecs[1], snr=None )
+#         r_odf = single_tensor_odf( psphere.vertices, s_mevals[1], s_mevecs[1] )
+#         print 'Done simulating response function...'
             
-        if visu :
-            from dipy.viz import fvtk
-            r = fvtk.ren()
-            fvtk.add( r, fvtk.sphere_funcs( np.vstack((R[1:], r_odf)), psphere ) )
-            fvtk.show( r )
-            
-        s_sh,B_dwi   = sf_to_sh2( S[1:], sphere, sh_order )
-        r_sh,B_regul = sf_to_sh2( R[1:], psphere, sh_order )
-        r_rh         = sh_to_rh( r_sh, sh_order )
-        print 'Done computing reconstruction matrices...'
+#         if visu :
+#             from dipy.viz import fvtk
+#             r = fvtk.ren()
+#             fvtk.add( r, fvtk.sphere_funcs( np.vstack((R[1:], r_odf)), psphere ) )
+#             fvtk.show( r )
                 
-        np.savez('stuff_snr05.npz', B_dwi=B_dwi, B_regul=B_regul, s_sh=s_sh, r_sh=r_sh, r_rh=r_rh)
-    else :
-        npz = np.load('stuff_snr10.npz')
-        print npz.files
-        B_dwi = npz['B_dwi']
-        B_regul = npz['B_regul']
-        s_sh = npz['s_sh']
-        r_sh = npz['r_sh']
-        r_rh = npz['r_rh']
+#        np.savez('stuff_snr05.npz', B_dwi=B_dwi, B_regul=B_regul, s_sh=s_sh, r_sh=r_sh, r_rh=r_rh)
+#    else :
+#        npz = np.load('stuff_snr10.npz')
+#        print npz.files
+#        B_dwi = npz['B_dwi']
+#        B_regul = npz['B_regul']
+#        s_sh = npz['s_sh']
+#        r_sh = npz['r_sh']
+#        r_rh = npz['r_rh']
 
                 
 #     u_fodf_sh,b = sdeconv( r_rh, s_sh, sh_order, False )
@@ -352,11 +356,13 @@ def test_deconv():
         r[l/2] = 2 * np.pi * lpn(l, 0)[0][-1] / sharp
         sdt[l/2] = 1 / sharp
         frt[l/2] = 2 * np.pi * lpn(l, 0)[0][-1] 
-        
+
+    print 1/sdt    
     # This test is for e1 = 13.9 and e2 = 3.55 case    
     #r_bis = np.array([6.283, -36.829, 148.088, -537.100, 1828.486])
     #assert_array_almost_equal(r, r_bis, 0)
-        
+    # [ 1.          0.0987961   0.0214013   0.00570876  0.00169231]
+    
     i = 0
     for l in np.arange(0,sh_order+1,2) :
         for m in np.arange(-l,l+1) :
@@ -372,7 +378,11 @@ def test_deconv():
     # P_sdt is the SDT matrix to go from ODF to fODF
     P_sdt = np.diag( bbb )
     P_sdt_inv = np.diag( pp )
+
+
+
 #    print np.dot(P_sdt, P_sdt_inv)
+
     
     odf_sh = np.dot( P_frt, s_sh )
     qball_odf = sh_to_sf(odf_sh, psphere, sh_order)
