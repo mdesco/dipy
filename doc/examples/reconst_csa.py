@@ -108,6 +108,12 @@ fvtk.record(r, n_frames=1, out_path='csa_odfs.png', size=(600, 600))
 
    **Constant Solid Angle ODFs**.
 
+Next, we visualize the ODF peaks computed from the CSA model.
+
+"""
+
+
+"""
 Now, lets see compare with other ODF models available in dipy. We now compute the
 the analytical q-ball model of [Descoteaux2007]_ and save its SH coefficients and
 GFA. Note that, here, the GFA is computed directly from the SH coefficients.
@@ -160,7 +166,7 @@ fvtk.clear(r)
 
    **Min-max normazlied Q-ball ODFs**.
 
-Next, we compute the Opdf ODF model, save its SH coefficients and GFA, and visualize
+Finally, we compute the Opdf ODF model, save its SH coefficients and GFA, and visualize
 its ODFs. 
 """
 
@@ -188,7 +194,6 @@ fvtk.clear(r)
    
 Note that all the save NIFTI GFAs and SH coefficients datasets can be visualized and 
 explored interactively using the fibernavigator (https://github.com/scilus/fibernavigator).
-
 
 
 .. [Descoteaux2007] Descoteaux, M., et. al. 2007. Regularized, fast, and robust
