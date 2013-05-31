@@ -111,8 +111,7 @@ fvtk.record(r, n_frames=1, out_path='csa_odfs.png', size=(600, 600))
 Next, we visualize the ODF peaks computed from the CSA model.
 
 """
-
-
+TO DO.
 """
 Now, lets see compare with other ODF models available in dipy. We now compute the
 the analytical q-ball model of [Descoteaux2007]_ and save its SH coefficients and
