@@ -40,7 +40,12 @@ tensor_vals_reordered = tensor_vals[:,:,:,correct_order]
 nib.save(nib.Nifti1Image(tensor_vals_reordered.astype(np.float32), img.get_affine()), 
          'ROI_coefs.nii.gz')
 
-mask = data[..., 0] > 50
+# compute a mask from FSL
+# bet HARDI150.nii.gz mask -m 
+mask_file = 'mask_mask.nii.gz'
+mask_img = nib.load(mask_file)
+mask = mask_img.get_data()
+
 print('Performing DTI full brain ... (be patient)')
 tenfit = tenmodel.fit(data, mask)
 FA = fractional_anisotropy(tenfit.evals)

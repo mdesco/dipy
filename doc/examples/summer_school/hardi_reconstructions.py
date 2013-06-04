@@ -66,16 +66,18 @@ fvtk.record(ren, n_frames=1, out_path='csa_odfs_positive.png', size=(600, 600))
 # TO DO: visualize peaks
 
 
-
-
-mask = data[..., 0] > 50
+mask_file = 'mask_mask.nii.gz'
+mask_img = nib.load(mask_file)
+mask = mask_img.get_data()
 qmodel = QballModel(gtab, order, smooth=0.006)
-print 'Computing the ODFs and GFA on the full brain...'
+print 'Computing the ODFs and GFA on the full brain (be patient)...'
 qfit = qmodel.fit(data, mask) 
 SH_coeff   = qfit._shm_coef
 GFA     = gfa(qfit.odf(sphere2))
 nib.save(nib.Nifti1Image(GFA.astype('float32'), img.get_affine()), 'gfa.nii.gz')    
 nib.save(nib.Nifti1Image(SH_coeff.astype('float32'), img.get_affine()), 'csa_odf_sh.nii.gz')
+
+
 
 
 
