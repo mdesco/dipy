@@ -65,6 +65,9 @@ fvtk.record(ren, n_frames=1, out_path='csa_odfs_positive.png', size=(600, 600))
 
 # TO DO: visualize peaks
 
+
+
+
 mask = data[..., 0] > 50
 qmodel = QballModel(gtab, order, smooth=0.006)
 print 'Computing the ODFs and GFA on the full brain...'
