@@ -11,11 +11,11 @@ img, gtab = read_stanford_hardi()
 data = img.get_data()
 print('data.shape (%d, %d, %d, %d)' % data.shape)
 
-import matplotlib.pyplot as plt
-fig = plt.figure()
-ax  = fig.add_subplot(111)
-slice_b0 = data[:,:,38,0]
-plt.imshow(slice_b0.T)
+#import matplotlib.pyplot as plt
+#fig = plt.figure()
+#ax  = fig.add_subplot(111)
+#slice_b0 = data[:,:,38,0]
+#plt.imshow(slice_b0.T)
 
 #slice_dwi100 = data[:,:,38,100]
 #plt.imshow(slice_dwi100.T)
