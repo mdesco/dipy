@@ -3,10 +3,6 @@ import nibabel as nib
 from dipy.data import fetch_stanford_hardi, read_stanford_hardi
 
 fetch_stanford_hardi()
-# the data is in your $HOME/.dipy directory
-# launch your favorite viewer and look at the data. For example, anatomist.
-
-# Loading the data into python
 img, gtab = read_stanford_hardi()
 data = img.get_data()
 print('data.shape (%d, %d, %d, %d)' % data.shape)
