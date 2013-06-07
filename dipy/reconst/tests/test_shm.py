@@ -240,10 +240,12 @@ class TestQballModel(object):
     def test_basis_choice(self):
         signal, gtab, expected = make_fake_signal()
         sh_order = 4
-        model1 = self.model(gtab, sh_order=sh_order, min_signal=1e-5,
+        smooth = .006
+
+        model1 = self.model(gtab, sh_order, min_signal=1e-5, smooth=smooth,
                             sph_harm_basis=mrtrix_sph_harm_basis)
         fit1 = model1.fit(signal)
-        model2 = self.model(gtab, sh_order=sh_order, min_signal=1e-5,
+        model2 = self.model(gtab, sh_order, min_signal=1e-5, smooth=smooth,
                             sph_harm_basis=fibernav_sph_harm_basis)
         fit2 = model2.fit(signal)
         sphere = hemi_icosahedron.subdivide(2)
