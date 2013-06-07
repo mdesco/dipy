@@ -81,7 +81,7 @@ def real_sph_harm(m, n, theta, phi):
     return real_sh
 
 
-def real_sph_harm_mrtrix(sh_order, theta, phi):
+def mrtrix_sph_harm_basis(sh_order, theta, phi):
     """
     Compute real spherical harmonics as in mrtrix, where the real harmonic
     $Y^m_n$ is defined to be::
@@ -124,7 +124,7 @@ def real_sph_harm_mrtrix(sh_order, theta, phi):
     return real_sh, m, n
 
 
-def real_sph_harm_fibernav(sh_order, theta, phi):
+def fibernav_sph_harm_basis(sh_order, theta, phi):
     """
     Compute real spherical harmonics as in fibernavigator, where the real
     harmonic $Y^m_n$ is defined to be::
@@ -168,9 +168,23 @@ def real_sph_harm_fibernav(sh_order, theta, phi):
     return real_sh, m, n
 
 
-sph_harm_lookup = {None: real_sph_harm_fibernav,
-                   "mrtrix": real_sph_harm_mrtrix,
-                   "fibernav": real_sph_harm_fibernav}
+default_sph_harm_basis = fibernav_sph_harm_basis
+sph_harm_lookup = {None: default_sph_harm_basis,
+                   "mrtrix": mrtrix_sph_harm_basis,
+                   "fibernav": fibernav_sph_harm_basis}
+
+
+# I'm putting this here so as to not break any existing code, but we should
+# remove these asap, hopefully before the next release
+@np.deprecate_with_doc("Use mrtrix_sph_harm_basis in place of "
+                       "real_sph_harm_mrtrix")
+def real_sph_harm_mrtrix(*args, **kwargs):
+    mrtrix_sph_harm_basis(*args, **kwargs)
+
+@np.deprecate_with_doc("Use fibernav_sph_harm_basis in place of "
+                       "real_sph_harm_fibernav")
+def real_sph_harm_fibernav(*args, **kwargs):
+    fibernav_sph_harm_basis(*args, **kwargs)
 
 
 def sph_harm_ind_list(sh_order):
@@ -265,7 +279,7 @@ class SphHarmModel(OdfModel, Cache):
     """The base class to sub-classed by specific spherical harmonic models of
     diffusion data"""
     def __init__(self, gtab, sh_order, smooth=0, min_signal=1.,
-                 assume_normed=False):
+                 assume_normed=False, sph_harm_basis=default_sph_harm_basis):
         """Creates a model that can be used to fit or sample diffusion data
 
         Arguments
@@ -280,17 +294,18 @@ class SphHarmModel(OdfModel, Cache):
             If True, data will not be normalized before fitting to the model
 
         """
-        m, n = sph_harm_ind_list(sh_order)
         self._where_b0s = lazy_index(gtab.b0s_mask)
         self._where_dwi = lazy_index(~gtab.b0s_mask)
         self.assume_normed = assume_normed
         self.min_signal = min_signal
+        self.sph_harm_basis = sph_harm_basis
         x, y, z = gtab.gradients[self._where_dwi].T
         r, theta, phi = cart2sphere(x, y, z)
-        B = real_sph_harm(m, n, theta[:, None], phi[:, None])
+        B, m, n = sph_harm_basis(sh_order, theta[:, None], phi[:, None])
         L = -n * (n + 1)
         legendre0 = lpn(sh_order, 0)[0]
         F = legendre0[n]
+        self.sh_order = sh_order
         self.B = B
         self.m = m
         self.n = n
@@ -365,10 +380,22 @@ class SphHarmFit(OdfFit):
         if sampling_matrix is None:
             phi = sphere.phi.reshape((-1, 1))
             theta = sphere.theta.reshape((-1, 1))
-            sampling_matrix = real_sph_harm(self.model.m, self.model.n,
-                                            theta, phi)
+            sph_harm_basis = self.model.sph_harm_basis
+            sh_order = self.model.sh_order
+            sampling_matrix, m, n = sph_harm_basis(sh_order, theta, phi)
             self.model.cache_set("sampling_matrix", sphere, sampling_matrix)
         return dot(self._shm_coef, sampling_matrix.T)
+
+    @property
+    def shm_coeff(self):
+        """The spherical harmonic coefficients coefficients of the odf
+
+        Make this a property for now, if there is a usecase for modifying
+        the coefficients we can add a setter or expose the coefficients more
+        directly
+
+        """
+        return self._shm_coef
 
 
 class CsaOdfModel(SphHarmModel):
