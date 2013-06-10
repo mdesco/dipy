@@ -15,8 +15,8 @@ from dipy.sims.voxel import multi_tensor_odf
 from dipy.data import mrtrix_spherical_functions
 
 
-from dipy.reconst.shm import (real_sph_harm, real_sph_harm_mrtrix,
-                              real_sph_harm_fibernav, sph_harm_ind_list,
+from dipy.reconst.shm import (real_sph_harm, mrtrix_sph_harm_basis,
+                              fibernav_sph_harm_basis, sph_harm_ind_list,
                               OpdtModel, normalize_data, hat, lcr_matrix,
                               smooth_pinv, bootstrap_data_array,
                               bootstrap_data_voxel, ResidualBootstrapWrapper,
@@ -80,24 +80,24 @@ def test_real_sph_harm():
     assert_equal(rsh(aa, bb, cc, dd).shape, (3, 4, 5, 6))
 
 
-def test_real_sph_harm_mrtrix():
+def test_mrtrix_sph_harm_basis():
     coef, expected, sphere = mrtrix_spherical_functions()
-    basis, m, n = real_sph_harm_mrtrix(8, sphere.theta, sphere.phi)
+    basis, m, n = mrtrix_sph_harm_basis(8, sphere.theta, sphere.phi)
     func = np.dot(coef, basis.T)
     assert_array_almost_equal(func, expected, 4)
 
 
-def test_real_sph_harm_fibernav():
+def test_fibernav_sph_harm_basis():
     # This test should do for now
     # The mrtrix basis should be the same as re-ordering and re-scaling the
     # fibernav basis
     new_order = [0, 5, 4, 3, 2, 1, 14, 13, 12, 11, 10, 9, 8, 7, 6]
     sphere = hemi_icosahedron.subdivide(2)
-    basis, m, n = real_sph_harm_mrtrix(4, sphere.theta, sphere.phi)
+    basis, m, n = mrtrix_sph_harm_basis(4, sphere.theta, sphere.phi)
     expected = basis[:, new_order]
     expected *= np.where(m == 0, 1., np.sqrt(2))
 
-    fibernav_basis, m, n = real_sph_harm_fibernav(4, sphere.theta, sphere.phi)
+    fibernav_basis, m, n = fibernav_sph_harm_basis(4, sphere.theta, sphere.phi)
     assert_array_almost_equal(fibernav_basis, expected)
 
 
@@ -236,6 +236,31 @@ class TestQballModel(object):
         model = self.model(gtab, sh_order=6, min_signal=1e-5)
         assert_equal(model.B.shape[1], 28)
         assert_equal(max(model.n), 6)
+
+    def test_basis_choice(self):
+        signal, gtab, expected = make_fake_signal()
+        sh_order = 4
+        smooth = .006
+
+        model1 = self.model(gtab, sh_order, min_signal=1e-5, smooth=smooth,
+                            sph_harm_basis=mrtrix_sph_harm_basis)
+        fit1 = model1.fit(signal)
+        model2 = self.model(gtab, sh_order, min_signal=1e-5, smooth=smooth,
+                            sph_harm_basis=fibernav_sph_harm_basis)
+        fit2 = model2.fit(signal)
+        sphere = hemi_icosahedron.subdivide(2)
+
+        # Test through odf api
+        assert_array_almost_equal(fit1.odf(sphere), fit2.odf(sphere))
+        odf0 = fit1.odf(sphere)
+
+        # Test using basis directly
+        B1, m, n = mrtrix_sph_harm_basis(sh_order, sphere.theta, sphere.phi)
+        odf1 = np.dot(fit1.shm_coeff, B1.T)
+        B2, m, n = fibernav_sph_harm_basis(sh_order, sphere.theta, sphere.phi)
+        odf2 = np.dot(fit2.shm_coeff, B2.T)
+        assert_array_almost_equal(odf1, odf2)
+        assert_array_almost_equal(odf1, odf0)
 
 
 def test_SphHarmFit():
