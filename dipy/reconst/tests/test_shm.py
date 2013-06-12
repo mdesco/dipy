@@ -8,7 +8,7 @@ from numpy.testing import assert_array_equal, assert_array_almost_equal
 from dipy.core.sphere import hemi_icosahedron
 from dipy.core.gradients import gradient_table
 from dipy.sims.voxel import single_tensor
-from ..odf import peak_directions
+from ..odf import peak_directions, gfa
 from dipy.reconst.shm import sf_to_sh, sh_to_sf
 from dipy.reconst.interpolate import NearestNeighborInterpolator
 from dipy.sims.voxel import multi_tensor_odf
@@ -251,14 +251,35 @@ class TestQballModel(object):
         sphere = hemi_icosahedron.subdivide(2)
 
         # Test through odf api
-        assert_array_almost_equal(fit1.odf(sphere), fit2.odf(sphere))
         odf0 = fit1.odf(sphere)
+        odf00 = fit2.odf(sphere)
+        directions0, _, _ = peak_directions(odf0, sphere)
+        directions00, _, _ = peak_directions(odf00, sphere)
+        assert_equal(len(directions0), len(directions00))
+        print len(directions0), len(directions00)
+        
+        cos_similarity0 = (directions0 * directions0).sum(-1)
+        cos_similarity00 = (directions00 * directions00).sum(-1)
+        assert_array_almost_equal(cos_similarity0, cos_similarity00)
+        print cos_similarity0,cos_similarity00
+        
+        from dipy.viz import fvtk
+        r = fvtk.ren()
+        fvtk.add( r, fvtk.sphere_funcs( np.vstack((odf0, odf00)), sphere ) )
+        fvtk.show( r )
+        print gfa(odf0),gfa(odf00)
 
+        assert_array_almost_equal(fit1.odf(sphere), fit2.odf(sphere))
+        
         # Test using basis directly
         B1, m, n = mrtrix_sph_harm_basis(sh_order, sphere.theta, sphere.phi)
         odf1 = np.dot(fit1.shm_coeff, B1.T)
+        print gfa(odf1)
+        
         B2, m, n = fibernav_sph_harm_basis(sh_order, sphere.theta, sphere.phi)
         odf2 = np.dot(fit2.shm_coeff, B2.T)
+        print gfa(odf2)
+        
         assert_array_almost_equal(odf1, odf2)
         assert_array_almost_equal(odf1, odf0)
 
