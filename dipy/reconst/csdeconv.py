@@ -14,7 +14,7 @@ from dipy.core.geometry import cart2sphere
 from dipy.core.ndindex import ndindex
 from dipy.sims.voxel import single_tensor
 from scipy.special import lpn
-
+from scipy.integrate import quad
 
 @multi_voxel_model
 class ConstrainedSphericalDeconvModel(OdfModel, Cache):
@@ -382,9 +382,8 @@ def forward_sdt_deconv_mat(ratio, sh_order):
     frt = np.zeros(m.shape) # FRT (Funk-Radon transform) q-ball matrix
     b = np.zeros(m.shape)
     bb = np.zeros(m.shape)
-
+        
     for l in np.arange(0, sh_order + 1, 2):
-        from scipy.integrate import quad
         sharp = quad(lambda z: lpn(l, z)[0][-1] * np.sqrt(1 / (1 - (1 - ratio) * z * z)), -1., 1.)
 
         sdt[l / 2] = sharp[0]
@@ -447,8 +446,8 @@ def csdeconv(s_sh, sh_order, R, B_reg, lambda_=1., tau=0.1):
 
     fodf = np.dot(B_reg, fodf_sh)
     # set threshold on FOD amplitude used to identify 'negative' values
-    threshold = tau * np.mean(np.dot(B_reg, fodf_sh))
-    print(np.min(fodf), np.max(fodf), np.mean(fodf), threshold, tau)
+    threshold = tau * np.mean(fodf)
+    #print(np.min(fodf), np.max(fodf), np.mean(fodf), np.mean(fodf.clip(min=0)), threshold, tau)
 
     k = []
     convergence = 50
@@ -525,8 +524,8 @@ def odf_deconv(odf_sh, sh_order, R, B_reg, lambda_=1., tau=0.1):
     fodf_sh /= Z
 
     fodf = np.dot(B_reg, fodf_sh)
-    threshold = tau * np.max(np.dot(B_reg, fodf_sh))
-    print(np.min(fodf), np.max(fodf), np.mean(fodf), threshold, tau)
+    threshold = tau * np.max(fodf) #threshold = tau * np.mean(fodf)
+    #print(np.min(fodf), np.max(fodf), np.mean(fodf), np.mean(fodf.clip(min=0)), threshold, tau)
 
     k = []
     convergence = 50
