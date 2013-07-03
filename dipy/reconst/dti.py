@@ -34,6 +34,7 @@ def _roll_evals(evals, axis=-1):
 
     return evals
 
+
 def fractional_anisotropy(evals, axis=-1):
     r"""
     Fractional anisotropy (FA) of a diffusion tensor.
@@ -210,26 +211,25 @@ def color_fa(fa, evecs):
         Colormap of the FA with red for the x value, y for the green
         value and z for the blue value.
 
-    Notes
+    Note
     -----
 
-    it is computed from the clipped FA between 0 and 1 using the following
+    It is computed from the clipped FA between 0 and 1 using the following
     formula
 
     .. math::
 
-        rgb = abs(max(eigen_vector)) \times fa
+        rgb = abs(max(\vec{e})) \times fa
     """
+
     if (fa.shape != evecs[..., 0, 0].shape) or ((3, 3) != evecs.shape[-2:]):
         raise ValueError("Wrong number of dimensions for evecs")
 
-    fa = np.clip(fa, 0, 1)
-    rgb = np.abs(evecs[..., 0]) * fa[..., None]
-    return rgb
+    return np.abs(evecs[..., 0]) * np.clip(fa, 0, 1)[..., None]
 
 
 # The following are used to calculate the tensor mode:
-def tensor_determinant(q_form):
+def determinant(q_form):
     """
     The determinant of a tensor, given in quadratic form
 
@@ -258,7 +258,7 @@ def tensor_determinant(q_form):
 
 def isotropic(q_form):
     r"""
-    Calculate the istropic part of the tensor [1]_.
+    Calculate the isotropic part of the tensor [1]_.
 
     Parameters
     ----------
@@ -325,7 +325,7 @@ def deviatoric(q_form):
     return A_squiggle
 
 
-def tensor_norm(q_form):
+def norm(q_form):
     r"""
     Calculate the Frobenius norm of a tensor quadratic form
 
@@ -355,7 +355,7 @@ def tensor_norm(q_form):
     return np.sqrt(np.sum(np.sum(np.abs(q_form ** 2), -1), -1))
 
 
-def tensor_mode(q_form):
+def mode(q_form):
     r"""
     Mode (MO) of a diffusion tensor [1]_.
 
@@ -392,13 +392,13 @@ def tensor_mode(q_form):
     """
 
     A_squiggle = deviatoric(q_form)
-    A_s_norm = tensor_norm(A_squiggle)
+    A_s_norm = norm(A_squiggle)
     # Add two dims for the (3,3), so that it can broadcast on A_squiggle:
     A_s_norm = A_s_norm.reshape(A_s_norm.shape + (1, 1))
-    return  3 * np.sqrt(6) * tensor_determinant((A_squiggle / A_s_norm))
+    return 3 * np.sqrt(6) * determinant((A_squiggle / A_s_norm))
 
 
-def tensor_linearity(evals, axis=-1):
+def linearity(evals, axis=-1):
     r"""
     The linearity of the tensor [1]_
 
@@ -433,7 +433,7 @@ def tensor_linearity(evals, axis=-1):
     return (ev1 - ev2) / evals.sum(0)
 
 
-def tensor_planarity(evals, axis=-1):
+def planarity(evals, axis=-1):
     r"""
     The planarity of the tensor [1]_
 
@@ -468,7 +468,7 @@ def tensor_planarity(evals, axis=-1):
     return (2 * (ev2 - ev3) / evals.sum(0))
 
 
-def tensor_sphericity(evals, axis=-1):
+def sphericity(evals, axis=-1):
     r"""
     The sphericity of the tensor [1]_
 
@@ -644,7 +644,7 @@ class TensorFit(object):
         Tensor mode calculated from cached eigenvalues.
 
         """
-        return tensor_mode(self.quadratic_form)
+        return mode(self.quadratic_form)
 
     @auto_attr
     def md(self):
@@ -731,7 +731,6 @@ class TensorFit(object):
         """
         return trace(self.evals)
 
-
     @auto_attr
     def planarity(self):
         r"""
@@ -755,8 +754,7 @@ class TensorFit(object):
             analysis" in Proc. 5th Annual ISMRM, 1997.
 
         """
-        return tensor_planarity(self.evals)
-
+        return planarity(self.evals)
 
     @auto_attr
     def linearity(self):
@@ -781,8 +779,7 @@ class TensorFit(object):
             analysis" in Proc. 5th Annual ISMRM, 1997.
 
         """
-        return tensor_linearity(self.evals)
-
+        return linearity(self.evals)
 
     @auto_attr
     def sphericity(self):
@@ -807,8 +804,7 @@ class TensorFit(object):
             analysis" in Proc. 5th Annual ISMRM, 1997.
 
         """
-        return tensor_sphericity(self.evals)
-
+        return sphericity(self.evals)
 
     def odf(self, sphere):
         lower = 4 * np.pi * np.sqrt(np.prod(self.evals, -1))
@@ -1084,7 +1080,7 @@ def lower_triangular(tensor, b0=None):
         return D
 
 
-def tensor_eig_from_lo_tri(data):
+def eig_from_lo_tri(data):
     """Calculates parameters for creating a Tensor instance
 
     Calculates tensor parameters from the six unique tensor elements. This
