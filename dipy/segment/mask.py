@@ -1,7 +1,10 @@
 import numpy as np
+
 import copy
 from scipy.ndimage import binary_opening, label
 from scipy.ndimage.filters import median_filter
+from scipy.ndimage import binary_opening, label
+
 
 def hist_mask(mean_volume, reference_volume=None, m=0.2, M=0.9,
               cc=True, opening=2, exclude_zeros=False):
