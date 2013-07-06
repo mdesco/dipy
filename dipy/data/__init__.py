@@ -24,7 +24,8 @@ from dipy.core.gradients import gradient_table
 from dipy.core.sphere import Sphere
 from dipy.sims.voxel import SticksAndBall
 import numpy as np
-from dipy.data.fetcher import (fetch_stanford_hardi,
+from dipy.data.fetcher import (fetch_scil_b0,
+                               fetch_stanford_hardi,
                                read_stanford_hardi,
                                fetch_taiwan_ntu_dsi,
                                read_taiwan_ntu_dsi)
