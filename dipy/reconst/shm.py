@@ -82,7 +82,7 @@ def real_sph_harm(m, n, theta, phi):
     return real_sh
 
 
-def real_sph_harm_mrtrix(sh_order, theta, phi):
+def real_sym_sh_mrtrix(sh_order, theta, phi):
     """
     Compute real spherical harmonics as in mrtrix, where the real harmonic
     $Y^m_n$ is defined to be::
@@ -125,10 +125,13 @@ def real_sph_harm_mrtrix(sh_order, theta, phi):
     return real_sh, m, n
 
 
-def real_sph_harm_fibernav(sh_order, theta, phi):
-    """
-    Compute real spherical harmonics as in fibernavigator, where the real
-    harmonic $Y^m_n$ is defined to be::
+def real_sym_sh_basis(sh_order, theta, phi):
+    """Samples a real symmetric spherical harmonic basis at point on the sphere
+
+    Samples the basis functions up to order `sh_order` at points on the sphere
+    given by `theta` and `phi`. The basis functions are defined here the same
+    way as in fibernavigator [1]_ where the real harmonic $Y^m_n$ is defined to
+    be:
 
         Imag($Y^m_n$) * sqrt(2)     if m > 0
         $Y^m_n$                     if m == 0
@@ -149,8 +152,7 @@ def real_sph_harm_fibernav(sh_order, theta, phi):
     Returns
     --------
     y_mn : real float
-        The real harmonic $Y^m_n$ sampled at `theta` and `phi` as
-        implemented in the FiberNavigator [1]_.
+        The real harmonic $Y^m_n$ sampled at `theta` and `phi`
     m : array
         The order of the harmonics.
     n : array
@@ -169,9 +171,9 @@ def real_sph_harm_fibernav(sh_order, theta, phi):
     return real_sh, m, n
 
 
-sph_harm_lookup = {None: real_sph_harm_fibernav,
-                   "mrtrix": real_sph_harm_mrtrix,
-                   "fibernav": real_sph_harm_fibernav}
+sph_harm_lookup = {None: real_sym_sh_basis,
+                   "mrtrix": real_sym_sh_mrtrix,
+                   "fibernav": real_sym_sh_basis}
 
 
 def sph_harm_ind_list(sh_order):
@@ -275,15 +277,15 @@ class SphHarmModel(OdfModel, Cache):
             Diffusion gradients used to acquire data
         sh_order : even int >= 0
             the spherical harmonic order of the model
-        smoothness : float between 0 and 1
+        smooth : float between 0 and 1, optional
             The regularization parameter of the model
-        min_signal : float, > 0
+        min_signal : float, > 0, optional
             During fitting, all signal values less than `min_signal` are
             clipped to `min_signal`. This is done primarily to avoid values
             less than or equal to zero when taking logs.
-        assume_normed : bool
+        assume_normed : bool, optional
             If True, clipping and normalization of the data with respect to the
-            B0 signal are skipped during mode fitting. This is an advanced
+            mean B0 signal are skipped during mode fitting. This is an advanced
             feature and should be used with care.
 
         See Also
@@ -291,17 +293,17 @@ class SphHarmModel(OdfModel, Cache):
         normalize_data
 
         """
-        m, n = sph_harm_ind_list(sh_order)
         self._where_b0s = lazy_index(gtab.b0s_mask)
         self._where_dwi = lazy_index(~gtab.b0s_mask)
         self.assume_normed = assume_normed
         self.min_signal = min_signal
         x, y, z = gtab.gradients[self._where_dwi].T
         r, theta, phi = cart2sphere(x, y, z)
-        B = real_sph_harm(m, n, theta[:, None], phi[:, None])
+        B, m, n = real_sym_sh_basis(sh_order, theta[:, None], phi[:, None])
         L = -n * (n + 1)
         legendre0 = lpn(sh_order, 0)[0]
         F = legendre0[n]
+        self.sh_order = sh_order
         self.B = B
         self.m = m
         self.n = n
@@ -376,17 +378,21 @@ class SphHarmFit(OdfFit):
         if sampling_matrix is None:
             phi = sphere.phi.reshape((-1, 1))
             theta = sphere.theta.reshape((-1, 1))
-            sampling_matrix = real_sph_harm(self.model.m, self.model.n,
-                                            theta, phi)
+            sh_order = self.model.sh_order
+            sampling_matrix, m, n = real_sym_sh_basis(sh_order, theta, phi)
             self.model.cache_set("sampling_matrix", sphere, sampling_matrix)
         return dot(self._shm_coef, sampling_matrix.T)
 
-    @auto_attr
-    def gfa(self):
-        """ The gfa of the odf, computed from the spherical harmonic
-        coefficients"""
-        coef = self._shm_coef
-        return np.sqrt(1. - (coef[..., 0]**2 / (coef**2).sum(-1)))
+    @property
+    def shm_coeff(self):
+        """The spherical harmonic coefficients coefficients of the odf
+
+        Make this a property for now, if there is a usecase for modifying
+        the coefficients we can add a setter or expose the coefficients more
+        directly
+
+        """
+        return self._shm_coef
 
 
 class CsaOdfModel(SphHarmModel):
@@ -399,6 +405,7 @@ class CsaOdfModel(SphHarmModel):
     """
     min = .001
     max = .999
+    _n0_const = .5 / np.sqrt(np.pi)
 
     def _set_fit_matrix(self, B, L, F, smooth):
         """The fit matrix, is used by fit_coefficients to return the
@@ -407,7 +414,6 @@ class CsaOdfModel(SphHarmModel):
         L = L[:, None]
         F = F[:, None]
         self._fit_matrix =  (F * L) / (8 * np.pi) * invB
-        self._const = .5 / np.sqrt(np.pi)
 
     def _get_shm_coef(self, data, mask=None):
         """Returns the coefficients of the model"""
@@ -415,7 +421,7 @@ class CsaOdfModel(SphHarmModel):
         data = data.clip(self.min, self.max)
         loglog_data = np.log(-np.log(data))
         sh_coef = dot(loglog_data, self._fit_matrix.T)
-        sh_coef[..., 0] = self._const
+        sh_coef[..., 0] = self._n0_const
         return sh_coef
 
 

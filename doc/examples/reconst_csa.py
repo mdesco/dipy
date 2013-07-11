@@ -79,26 +79,21 @@ nib.save(nib.Nifti1Image(GFA.astype(np.float32), img.get_affine()), 'GFA_csa.nii
 """
 GFA.shape ``(81, 106, 76)``
 
-Apart from GFA csapeaks has also the attributes peak_values, peak_indices and
+Apart from GFA, csapeaks also has the attributes peak_values, peak_indices and
 ODF. peak_values shows the maxima values of the ODF and peak_indices gives us
 their position on the discrete sphere that was used to do the reconstruction of
-the ODF. In order to obtain the full ODF return_odf should be True. Before
-enabling this option make sure that you have enough memory.
+the ODF. In order to obtain the full ODF, return_odf should be True. Before
+enabling this option, make sure that you have enough memory.
 
+<<<<<<< HEAD
 Finally lets try to visualize the orientation distribution functions for a small
 region of interest (ROI) part of the splenium of the corpus callosum (CC).
 """
 
-data_small  = data[20:50,55:85, 38:39] 
-from dipy.data import get_sphere
-sphere = get_sphere('symmetric724')
-csa_odfs = csamodel.fit(data_small).odf(sphere)
+data_small  = data[20:50,55:85, 38:39]
 
-from dipy.viz import fvtk
-r = fvtk.ren()
-fvtk.add(r, fvtk.sphere_funcs(csa_odfs, sphere, colormap='jet'))
-#fvtk.show(r)
-
+fvtk.add(r, fvtk.sphere_funcs(csamodel.fit(data_small).odf(sphere),
+                              sphere, colormap='jet'))
 print('Saving illustration as csa_odfs.png')
 fvtk.record(r, n_frames=1, out_path='csa_odfs.png', size=(600, 600))
 
