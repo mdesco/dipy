@@ -152,8 +152,8 @@ class PeaksAndMetrics(object):
 
 def peaks_from_model(model, data, sphere, relative_peak_threshold,
                      min_separation_angle, mask=None, return_odf=False,
-                     return_sh=True, gfa_thr=0.02, normalize_peaks=False,
-                     sh_order=8, sh_basis_type=None, sh_smooth=0):
+                     return_sh=True, gfa_thr=0, normalize_peaks=False,
+                     sh_order=8, sh_basis_type=None):
     """Fits the model to data and computes peaks and metrics
 
     Parameters
@@ -186,13 +186,11 @@ def peaks_from_model(model, data, sphere, relative_peak_threshold,
         ``None`` for the default dipy basis which is the fibernav basis,
         ``mrtrix`` for the MRtrix basis, and
         ``fibernav`` for the FiberNavigator basis
-    sh_smooth : float, optional
-        Lambda-regularization in the SH fit (default 0.0).
-
+    
     Returns
     -------
     pam : PeaksAndMetrics
-        an object with ``gfa``, ``peak_values``, ``peak_indices``, ``odf``, 
+        an object with ``gfa``, ``peak_values``, ``peak_indices``, ``odf``,
         ``shm_coeffs`` as attributes
 
     """
@@ -207,6 +205,7 @@ def peaks_from_model(model, data, sphere, relative_peak_threshold,
             raise ValueError("mask is not the same size as data")
 
     npeaks = 5
+    sh_smooth=0
     gfa_array = np.zeros(size)
     qa_array = np.zeros((size, npeaks))
     peak_values = np.zeros((size, npeaks))
@@ -281,7 +280,7 @@ def peaks_from_model(model, data, sphere, relative_peak_threshold,
     else:
         pam.shm_coeff = None
         pam.invB = None
-        
+
     if return_odf:
         pam.odf = odf_array.reshape(shape + odf_array.shape[-1:])
     else:
@@ -320,7 +319,7 @@ def minmax_normalize(samples, out=None):
 
     """
     if out is None:
-        dtype = np.promote_types('float32', samples.dtype)
+        dtype = np.common_type(np.empty(0, 'float32'), samples)
         out = np.array(samples, dtype=dtype, copy=True)
     else:
         out[:] = samples
