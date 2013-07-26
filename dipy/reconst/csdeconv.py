@@ -112,7 +112,15 @@ class ConstrainedSphericalDeconvModel(OdfModel, Cache):
 
     def fit(self, data):
         s_sh = np.linalg.lstsq(self.B_dwi, data[self._where_dwi])[0]
-        shm_coeff, num_it = csdeconv(s_sh, self.sh_order, self.R, self.B_reg, self.lambda_, self.tau)
+        
+        scipy_or_not = 1
+        if scipy_or_not :
+            shm_coeff, num_it = csdeconv_scipy(s_sh, self.sh_order, self.R, 
+                                               self.B_reg, self.lambda_, self.tau)
+        else :
+            shm_coeff, num_it = csdeconv(s_sh, self.sh_order, self.R, 
+                                         self.B_reg, self.lambda_, self.tau)
+
         return SphHarmFit(self, shm_coeff, None)
 
 
@@ -435,6 +443,95 @@ def csdeconv(s_sh, sh_order, R, B_reg, lambda_=1., tau=0.1):
         M = np.concatenate((R, lambda_ * B_reg[k, :]))
         S = np.concatenate((s_sh, np.zeros(k.shape)))
         fodf_sh = np.linalg.lstsq(M, S)[0]
+
+    warning.warn('maximum number of iterations exceeded - failed to converge')
+    return fodf_sh, num_it
+
+def csdeconv_scipy(s_sh, sh_order, R, B_reg, lambda_=1., tau=0.1):
+    r""" Constrained-regarized spherical deconvolution (CSD) [1]_
+
+    Deconvolves the axially symmetric single fiber response
+    function `r_rh` in rotational harmonics coefficients from the spherical function
+    `s_sh` in SH coefficients.
+
+    Parameters
+    ----------
+    s_sh : ndarray (``(sh_order + 1)*(sh_order + 2)/2``,)
+         ndarray of SH coefficients for the spherical function to be deconvolved
+    sh_order : int
+         maximal SH order of the SH representation
+    R : ndarray (``(sh_order + 1)*(sh_order + 2)/2``, ``(sh_order + 1)*(sh_order + 2)/2``)
+        forward spherical harmonics matrix
+    B_reg : ndarray (``(sh_order + 1)*(sh_order + 2)/2``, ``(sh_order + 1)*(sh_order + 2)/2``)
+         SH basis matrix used for deconvolution
+    lambda_ : float
+         lambda parameter in minimization equation (default 1.0)
+    tau : float
+         threshold controlling the amplitude below which the corresponding fODF is assumed to be zero.
+         Ideally, tau should be set to zero. However, to improve the stability of the algorithm, tau
+         is set to tau*100 % of the max fODF amplitude (here, 10% by default). This is similar to peak
+         detection where peaks below 0.1 amplitude are usually considered noise peaks. Because SDT
+         is based on a q-ball ODF deconvolution, and not signal deconvolution, using the max instead
+         of mean (as in CSD), is more stable.
+
+    Returns
+    -------
+    fodf_sh : ndarray (``(sh_order + 1)*(sh_order + 2)/2``,)
+         Spherical harmonics coefficients of the constrained-regarized fiber ODF
+    num_it : int
+         Number of iterations in the constrained-regarization used for convergence
+
+    References
+    ----------
+    .. [1] Tournier, J.D., et al. NeuroImage 2007. Robust determination of the fibre orientation
+           distribution in diffusion MRI: Non-negativity constrained super-resolved spherical
+           deconvolution
+    """
+    
+    from scipy.linalg import lstsq
+
+    # generate initial fODF estimate, truncated at SH order 4
+    tmp1 = R.copy()
+    tmp2 = s_sh.copy()
+
+    fodf_sh = lstsq(R, s_sh, overwrite_a=True, overwrite_b=True)[0] #fodf_sh, = np.linalg.lstsq(R, s_sh) # R\s_sh
+    print(lstsq(tmp1, tmp2, overwrite_a=True, overwrite_b=True)[0])
+    print(lstsq(R, s_sh)[0])
+    print(np.linalg.lstsq(R, s_sh)[0])
+    fodf_sh[15:] = 0
+
+    fodf = np.dot(B_reg, fodf_sh)
+    # set threshold on FOD amplitude used to identify 'negative' values
+    threshold = tau * np.mean(np.dot(B_reg, fodf_sh))
+    #print(np.min(fodf), np.max(fodf), np.mean(fodf), threshold, tau)
+
+    k = []
+    convergence = 50
+    for num_it in range(1, convergence + 1):
+        fodf = np.dot(B_reg, fodf_sh)
+
+        k2 = np.nonzero(fodf < threshold)[0]
+
+        if (k2.shape[0] + R.shape[0]) < B_reg.shape[1]:
+            warning.warn('too few negative directions identified - failed to converge')
+            return fodf_sh, num_it
+
+        if num_it > 1 and k.shape[0] == k2.shape[0]:
+            if (k == k2).all():
+                return fodf_sh, num_it
+
+        k = k2
+
+        # This is the super-resolved trick. 
+        # Wherever there is a negative amplitude value on the fODF, it concatinates a value
+        # to the S vector so that the estimation can focus on trying to eliminate it.
+        # In a sense, this "adds" a measurement, which can help to better estimate the fodf_sh,
+        # even if you have more SH coeffcients to estimate than actual S measurements. 
+        M = np.concatenate((R, lambda_ * B_reg[k, :]))
+        S = np.concatenate((s_sh, np.zeros(k.shape)))        
+                
+        fodf_sh = lstsq(M, S, overwrite_a=True, overwrite_b=True)[0]
+        #fodf_sh = np.linalg.lstsq(M, S)[0]
 
     warning.warn('maximum number of iterations exceeded - failed to converge')
     return fodf_sh, num_it

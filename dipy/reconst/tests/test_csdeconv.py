@@ -47,6 +47,16 @@ def test_csdeconv():
 
     fodf = csd_fit.odf(sphere)
 
+    from dipy.viz import fvtk
+    ren = fvtk.ren()
+    fvtk.add(ren, fvtk.sphere_funcs(fodf, sphere, colormap=None))
+    fvtk.show(ren)
+
+    from dipy.viz import fvtk
+    ren = fvtk.ren()
+    fvtk.add(ren, fvtk.sphere_funcs(odf_gt, sphere, colormap=None))
+    fvtk.show(ren)
+    
     directions, _, _ = peak_directions(odf_gt, sphere)
     directions2, _, _ = peak_directions(fodf, sphere)
 
@@ -164,6 +174,7 @@ def test_odf_sh_to_sharp():
 
 
 if __name__ == '__main__':
-    run_module_suite()
+    test_csdeconv()
+    #run_module_suite()
 
 
