@@ -160,7 +160,7 @@ def test_odf_sh_to_sharp():
     fodf = sh_to_sf(fodf_sh, sphere, sh_order=8, basis_type=None)
 
     directions2, _, _ = peak_directions(fodf[0, 0, 0], sphere)
-    print directions2
+    print(directions2)
     assert_equal(directions2.shape[0], 2)
 
     """
@@ -179,7 +179,7 @@ def test_odf_sh_to_sharp():
     fodf_trix = sh_to_sf(fodf_sh_trix, sphere, sh_order=8, basis_type='mrtrix')
 
     directions2, _, _ = peak_directions(fodf_trix[0, 0, 0], sphere)
-    print directions2
+    print(directions2)
 
     """
     # Helpful for visualizing the functions before and after sharpening
