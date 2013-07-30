@@ -1,6 +1,6 @@
 import warnings
 import numpy as np
-from numpy.testing import (assert_equal, run_module_suite)
+from numpy.testing import (assert_equal, run_module_suite, assert_)
 from dipy.data import get_sphere, get_data
 from dipy.sims.voxel import (multi_tensor,
                              multi_tensor_odf,
@@ -136,6 +136,7 @@ def test_odf_sh_to_sharp():
 
     S, sticks = multi_tensor(gtab, mevals, S0, angles=[(10, 0), (100, 0)],
                              fractions=[50, 50], snr=SNR)
+    print sticks
 
     sphere = get_sphere('symmetric724')
 
@@ -159,9 +160,53 @@ def test_odf_sh_to_sharp():
     fodf = sh_to_sf(fodf_sh, sphere, sh_order=8, basis_type=None)
 
     directions2, _, _ = peak_directions(fodf[0, 0, 0], sphere)
-
+    print directions2
     assert_equal(directions2.shape[0], 2)
 
+    """
+    # This part is failing, I believe it should pass
+    for i in range(len(directions2)):
+        peak = directions2[i]
+        expected = sticks[i]
+        assert_(abs(np.dot(peak, expected)) > .95)
+    """
+
+    odfs_sh_trix = sf_to_sh(odfs_gt, sphere, sh_order=8, basis_type='mrtrix')
+    # Test function using mrtrix basis
+    fodf_sh_trix = odf_sh_to_sharp(odfs_sh_trix, sphere, basis='mrtrix',
+                                   ratio=3 / 15., sh_order=8, lambda_=1.,
+                                   tau=1.)
+    fodf_trix = sh_to_sf(fodf_sh_trix, sphere, sh_order=8, basis_type='mrtrix')
+
+    directions2, _, _ = peak_directions(fodf_trix[0, 0, 0], sphere)
+    print directions2
+
+    """
+    # Helpful for visualizing the functions before and after sharpening
+
+    from dipy.viz import fvtk
+    r = fvtk.ren()
+    a = fvtk.sphere_funcs(odfs_gt, sphere)
+    fvtk.add(r, a)
+    fvtk.show(r)
+
+    r = fvtk.ren()
+    a = fvtk.sphere_funcs(fodf, sphere)
+    fvtk.add(r, a)
+    fvtk.show(r)
+
+    r = fvtk.ren()
+    a = fvtk.sphere_funcs(fodf_trix, sphere)
+    fvtk.add(r, a)
+    fvtk.show(r)
+
+    """
+
+    assert_equal(directions2.shape[0], 2)
+    for i in range(len(directions2)):
+        peak = directions2[i]
+        expected = sticks[i]
+        assert_(abs(np.dot(peak, expected)) > .95)
 
 if __name__ == '__main__':
     run_module_suite()
