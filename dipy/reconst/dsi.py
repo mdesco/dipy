@@ -153,21 +153,37 @@ class DiffusionSpectrumFit(OdfFit):
         self._peak_values = None
         self._peak_indices = None
 
+
     def pdf(self):
         """ Applies the 3D FFT in the q-space grid to generate
         the diffusion propagator
         """
         values = self.data * self.model.filter
-        #create the signal volume
+        
         Sq = np.zeros((self.qgrid_sz, self.qgrid_sz, self.qgrid_sz))
-        #fill q-space
-        for i in range(self.dn):
+
+        for i in range(self.dn+1):
             qx, qy, qz = self.model.qgrid[i]
             Sq[qx, qy, qz] += values[i]
-        #apply fourier transform
-        Pr = fftshift(np.abs(np.real(fftn(ifftshift(Sq),
-                                          3 * (self.qgrid_sz, )))))
-        return Pr
+
+        Pr = fftshift(fftn(ifftshift(Sq), 3 * (self.qgrid_sz, )))
+        return np.real(Pr)
+
+#     def pdf(self):
+#         """ Applies the 3D FFT in the q-space grid to generate
+#         the diffusion propagator
+#         """
+#         values = self.data * self.model.filter
+#         #create the signal volume
+#         Sq = np.zeros((self.qgrid_sz, self.qgrid_sz, self.qgrid_sz))
+#         #fill q-space
+#         for i in range(self.dn):
+#             qx, qy, qz = self.model.qgrid[i]
+#             Sq[qx, qy, qz] += values[i]
+#         #apply fourier transform
+#         Pr = fftshift(np.abs(np.real(fftn(ifftshift(Sq),
+#                                           3 * (self.qgrid_sz, )))))
+#         return Pr
 
     def odf(self, sphere):
         r""" Calculates the real discrete odf for a given discrete sphere
