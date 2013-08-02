@@ -300,32 +300,6 @@ def gfa(samples):
 
 def minmax_normalize(samples, out=None):
     """Min-max normalization of a function evaluated on the unit sphere
-<<<<<<< HEAD
-
-    Normalizes samples to ``(samples - min(samples)) / (max(samples) -
-    min(samples))`` for each unit sphere.
-
-    Parameters
-    ----------
-    samples : ndarray (..., N)
-        N samples on a unit sphere for each point, stored along the last axis
-        of the array.
-    out : ndrray (..., N), optional
-        An array to store the normalized samples.
-
-    Returns
-    -------
-    out : ndarray, (..., N)
-        Normalized samples.
-
-    """
-    if out is None:
-        dtype = np.promote_types('float32', samples.dtype)
-        out = np.array(samples, dtype=dtype, copy=True)
-    else:
-        out[:] = samples
-
-=======
 
     Normalizes samples to ``(samples - min(samples)) / (max(samples) -
     min(samples))`` for each unit sphere.
@@ -350,7 +324,6 @@ def minmax_normalize(samples, out=None):
     else:
         out[:] = samples
 
->>>>>>> 043eb360d57ad18ce5193a9c897b7441f2b161d4
     sample_mins = np.min(samples, -1)[..., None]
     sample_maxes = np.max(samples, -1)[..., None]
     out -= sample_mins
