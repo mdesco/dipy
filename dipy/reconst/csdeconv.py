@@ -485,7 +485,7 @@ def odf_deconv(odf_sh, sh_order, R, B_reg, lambda_=1., tau=0.1):
     fodf_sh /= Z
 
     fodf = np.dot(B_reg, fodf_sh)
-    threshold = tau * np.max(np.dot(B_reg, fodf_sh))
+    threshold = tau * np.max(fodf)
     #print(np.min(fodf), np.max(fodf), np.mean(fodf), threshold, tau)
 
     k = []
@@ -519,6 +519,9 @@ def odf_sh_to_sharp(odfs_sh, sphere, basis=None, ratio=3 / 15., sh_order=8, lamb
     ratio and sharpen almost any ODF-like spherical function. The constrained-regularization is stable
     and will not only sharp the ODF peaks but also regularize the noisy peaks.
 
+    Note that default parameters are optimized for the 'fibernav' and None bases. If the 'mrtrix'
+    basis is used, we recommend tau=1. 
+
     Parameters
     ---------- 
     odfs_sh : ndarray (``(sh_order + 1)*(sh_order + 2)/2``, )
@@ -547,18 +550,17 @@ def odf_sh_to_sharp(odfs_sh, sphere, basis=None, ratio=3 / 15., sh_order=8, lamb
     .. [1] Descoteaux, M., et al. IEEE TMI 2009. Deterministic and Probabilistic Tractography Based
            on Complex Fibre Orientation Distributions
     """
+    real_sym_sh = sph_harm_lookup[basis]
     m, n = sph_harm_ind_list(sh_order)
     r, theta, phi = cart2sphere(sphere.x, sphere.y, sphere.z)
 
-    real_sym_sh = sph_harm_lookup[basis]
-
-    B_reg, m, n = real_sym_sh(sh_order, theta[:, None], phi[:, None])
-    
+    B_reg, m, n = real_sym_sh(sh_order, theta[:, None], phi[:, None])    
     R, P = forward_sdt_deconv_mat(ratio, sh_order)
 
     # scale lambda to account for differences in the number of
     # SH coefficients and number of mapped directions
-    lambda_ = lambda_ * R.shape[0] * R[0, 0] / B_reg.shape[0]
+    lambda_ = lambda_ * R.shape[0] * R[0, 0] / B_reg.shape[0]    
+    #print(lambda_, tau)
 
     fodf_sh = np.zeros(odfs_sh.shape)
 

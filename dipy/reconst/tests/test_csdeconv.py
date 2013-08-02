@@ -9,7 +9,7 @@ from dipy.core.gradients import gradient_table
 from dipy.reconst.csdeconv import (ConstrainedSphericalDeconvModel,
                                    ConstrainedSDTModel,
                                    odf_sh_to_sharp)
-from dipy.reconst.odf import peak_directions
+from dipy.reconst.odf import peak_directions, minmax_normalize
 from dipy.core.sphere_stats import angular_similarity
 from dipy.reconst.shm import sf_to_sh, sh_to_sf, QballModel
 
@@ -136,7 +136,7 @@ def test_odf_sh_to_sharp():
 
     S, sticks = multi_tensor(gtab, mevals, S0, angles=[(10, 0), (100, 0)],
                              fractions=[50, 50], snr=SNR)
-    print sticks
+    #print sticks
 
     sphere = get_sphere('symmetric724')
 
@@ -151,42 +151,58 @@ def test_odf_sh_to_sharp():
     odfs_gt[:,:,:] = odf_gt[:]
 
     odfs_sh = sf_to_sh(odfs_gt, sphere, sh_order=8, basis_type=None)
-
     odfs_sh /= Z
 
+    # odf_sh_to_sharp (lambda, tau) default parameters are optimized 
+    # to work with the default network
     fodf_sh = odf_sh_to_sharp(odfs_sh, sphere, basis=None, ratio=3 / 15.,
-                              sh_order=8, lambda_=1., tau=1.)
-
+                              sh_order=8, lambda_=1., tau=0.1)
     fodf = sh_to_sf(fodf_sh, sphere, sh_order=8, basis_type=None)
 
     directions2, _, _ = peak_directions(fodf[0, 0, 0], sphere)
-    print(directions2)
+    #print(directions2)
     assert_equal(directions2.shape[0], 2)
 
-    """
-    # This part is failing, I believe it should pass
+    # directions must be sorted
     for i in range(len(directions2)):
         peak = directions2[i]
-        expected = sticks[i]
+        expected = sticks[i]        
+        
+        # maxima mis-matched
+        if abs(np.dot(peak, expected)) < .95 :
+            expected = sticks[(i+1)%2]
+        
         assert_(abs(np.dot(peak, expected)) > .95)
-    """
 
+    # Because the MRtrix SH matrix is not normalized the default parameter must
+    # be set 10 times higher 
     odfs_sh_trix = sf_to_sh(odfs_gt, sphere, sh_order=8, basis_type='mrtrix')
     # Test function using mrtrix basis
     fodf_sh_trix = odf_sh_to_sharp(odfs_sh_trix, sphere, basis='mrtrix',
-                                   ratio=3 / 15., sh_order=8, lambda_=1.,
-                                   tau=1.)
-    fodf_trix = sh_to_sf(fodf_sh_trix, sphere, sh_order=8, basis_type='mrtrix')
+                                   ratio=3 / 15., sh_order=8, lambda_=1., tau=1)
+    fodf_trix = sh_to_sf(fodf_sh_trix, sphere, sh_order=8, 
+                         basis_type='mrtrix')
 
     directions2, _, _ = peak_directions(fodf_trix[0, 0, 0], sphere)
-    print(directions2)
+    #print(directions2)
+
+    assert_equal(directions2.shape[0], 2)
+    for i in range(len(directions2)):
+        peak = directions2[i]
+        expected = sticks[i]
+        
+        # check mis-matched of maxima
+        if abs(np.dot(peak, expected)) < .95 :
+            expected = sticks[(i+1)%2]
+        
+        assert_(abs(np.dot(peak, expected)) > .95)
 
     """
     # Helpful for visualizing the functions before and after sharpening
-
+    
     from dipy.viz import fvtk
     r = fvtk.ren()
-    a = fvtk.sphere_funcs(odfs_gt, sphere)
+    a = fvtk.sphere_funcs(minmax_normalize(odfs_gt), sphere)
     fvtk.add(r, a)
     fvtk.show(r)
 
@@ -199,16 +215,10 @@ def test_odf_sh_to_sharp():
     a = fvtk.sphere_funcs(fodf_trix, sphere)
     fvtk.add(r, a)
     fvtk.show(r)
-
     """
-
-    assert_equal(directions2.shape[0], 2)
-    for i in range(len(directions2)):
-        peak = directions2[i]
-        expected = sticks[i]
-        assert_(abs(np.dot(peak, expected)) > .95)
 
 if __name__ == '__main__':
     run_module_suite()
+    #test_odf_sh_to_sharp()
 
 
