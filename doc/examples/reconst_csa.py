@@ -40,10 +40,12 @@ print('data.shape (%d, %d, %d, %d)' % data.shape)
 """
 data.shape ``(81, 106, 76, 160)``
 
-Remove most of the background in the following simple way.
+Remove most of the background using dipy's mask module.
 """
 
-mask = data[..., 0] > 50
+from dipy.segment.mask import median_otsu
+
+maskdata, mask = median_otsu(data, 3, 2, True, range(0,10))
 
 """
 We instantiate our CSA model with sperical harmonic order of 4
@@ -65,7 +67,7 @@ sphere = get_sphere('symmetric724')
 
 print 'Computing the CSA ODFs...'
 csapeaks = peaks_from_model(model=csamodel,
-                            data=data,
+                            data=maskdata,
                             sphere=sphere,
                             relative_peak_threshold=.8,
                             min_separation_angle=45,
