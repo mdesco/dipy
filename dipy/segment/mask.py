@@ -1,11 +1,16 @@
 from __future__ import division, print_function, absolute_import
+
 from warnings import warn
+
 import numpy as np
+
+from dipy.reconst.dti import fractional_anisotropy, color_fa
+
 from scipy.ndimage.filters import median_filter
 try:
     from skimage.filter import threshold_otsu as otsu
 except:
-    from dipy.segment.threshold import otsu
+    from .threshold import otsu
 
 
 def multi_median(input, median_radius, numpass):
@@ -17,59 +22,53 @@ def multi_median(input, median_radius, numpass):
     input : ndarray
         The input volume to apply filter on.
     median_radius : int
-        Radius (in voxels) of the applied median filter 
+        Radius (in voxels) of the applied median filter
     numpass: int
         Number of pass of the median filter
+
     Returns
     -------
     input : ndarray
         Filtered input volume.
     """
     outvol = np.zeros_like(input)
-    
+
     # Array representing the size of the median window in each dimension.
     medarr = np.ones_like(input.shape) * ((median_radius * 2) + 1)
-    
+
     # Multi pass
     for i in range(0, numpass):
         median_filter(input, medarr, output=input)
-
     return input
 
+
 def applymask(vol, mask):
-    """
-    Mask vol with mask.
+    """ Mask vol with mask.
 
     Parameters
     ----------
     vol : ndarray
-        Volume to apply mask on.
+        Array with $V$ dimensions
     mask : ndarray
-        Binary mask.
+        Binary mask.  Has $M$ dimensions where $M <= V$. When $M < V$, we append
+        $V - M$ dimensions with axis length 1 to `mask` so that `mask` will
+        broadcast against `vol`.  In the typical case `vol` can be 4D, `mask`
+        can be 3D, and we append a 1 to the mask shape which (via numpy
+        broadcasting) has the effect of appling the 3D mask to each 3D slice in
+        `vol` (``vol[..., 0]`` to ``vol[..., -1``).
+
+    Returns
+    -------
+    masked_vol : ndarray
+        `vol` multiplied by `mask` where `mask` may have been extended to match
+        extra dimensions in `vol`
     """
     mask = mask.reshape(mask.shape + (vol.ndim - mask.ndim) * (1,))
     return vol * mask
 
-def binary_threshold(vol, thresh):
-    """
-    Simple binary thresholding.
-
-    Parameters
-    ----------
-    vol : ndarray
-        Volume to apply threshold on.
-    thresh : float
-        Thresholding value.
-
-    Returns
-    -------
-        Binary ndarray.
-    """
-    return np.where(vol > thresh, True, False)
 
 def bounding_box(vol):
-    """
-    Compute the bounding box of nonzero intensity voxels in the volume.
+    """ Compute the bounding box of nonzero intensity voxels in the volume.
 
     Parameters
     ----------
@@ -82,7 +81,6 @@ def bounding_box(vol):
         Array containg minimum index of each dimension
     npmaxs : list
         Array containg maximum index of each dimension
-
     """
     # Find bounds on first dimension
     temp = vol
@@ -90,24 +88,20 @@ def bounding_box(vol):
         temp = temp.any(-1)
     mins = [temp.argmax()]
     maxs = [len(temp) - temp[::-1].argmax()]
-
     # Check that vol is not all 0
     if mins[0] == 0 and temp[0] == 0:
         warn('No data found in volume to bound. Returning empty bounding box.')
         return [0] * vol.ndim, [0] * vol.ndim
-
     # Find bounds on remaining dimensions
     if vol.ndim > 1:
         a, b = bounding_box(vol.any(0))
         mins.extend(a)
         maxs.extend(b)
-
     return mins, maxs
 
 
 def crop(vol, mins, maxs):
-    """
-    Crops the input volume.
+    """ Crops the input volume.
 
     Parameters
     ----------
@@ -120,23 +114,29 @@ def crop(vol, mins, maxs):
 
     Returns
     -------
-        vol : ndarray
-            The cropped volume.
+    vol : ndarray
+        The cropped volume.
     """
     return vol[tuple(slice(i, j) for i, j in zip(mins, maxs))]
 
-def median_otsu(input_volume, median_radius=4, numpass=4, autocrop=False, b0Slices=None):
-    """
-    Simple brain extraction tool method for images from DWI data. It uses a
-    median filter smoothing of the input_volumes b0Slices and an automatic
-    histogram Otsu thresholding technique, hence the name medain_otsu.
 
-    It mimics the MRtrix bet from the documentation.
-    (mrconvert dwi.nii -coord 3 0 - | threshold - - | median3D - - | median3D - mask.nii)
-    MRtrix uses default mean_radius=3 and numpass=2
+def median_otsu(input_volume, median_radius=4, numpass=4,
+                autocrop=False, b0Slices=None):
+    """ Simple brain extraction tool method for images from DWI data
 
-    However, from tests on multiple 1.5T and 3T data from
-    GE, Philips, Siemens, the most robust choice is median_radius=4, numpass=4
+    It uses a median filter smoothing of the input_volumes `b0Slices` and an
+    automatic histogram Otsu thresholding technique, hence the name
+    *median_otsu*.
+
+    It mimics the ``MRtrix`` bet from the documentation::
+
+        mrconvert dwi.nii -coord 3 0 - | threshold - - | median3D - - | \
+                median3D - mask.nii
+
+    ``MRtrix`` uses default ``mean_radius=3`` and ``numpass=2``
+
+    However, from tests on multiple 1.5T and 3T data from GE, Philips, Siemens,
+    the most robust choice is ``median_radius=4``, ``numpass=4``
 
     Parameters
     ----------
@@ -150,8 +150,10 @@ def median_otsu(input_volume, median_radius=4, numpass=4, autocrop=False, b0Slic
         if True, the masked input_volume will also be cropped using the bounding
         box defined by the masked data. Should be on if DWI is upsampled to 1x1x1
         resolution. (default False)
-    b0Slices : array
-        1D array representing indexes of the volume where b=0
+    b0Slices : None or array, optional
+        1D array representing indices of ``axis=3`` of a 4D `input_volume` where
+        the acquisition b value == 0. None (the default) corresponds to ``(0,)``
+        (assumes first volume in 4D array is b == 0)
 
     Returns
     -------
@@ -160,7 +162,6 @@ def median_otsu(input_volume, median_radius=4, numpass=4, autocrop=False, b0Slic
     mask : 3D ndarray
         The binary brain mask
     """
-
     if len(input_volume.shape) == 4:
         if b0Slices is not None:
             b0vol = np.mean(input_volume[..., tuple(b0Slices)], axis=3)
@@ -168,12 +169,10 @@ def median_otsu(input_volume, median_radius=4, numpass=4, autocrop=False, b0Slic
             b0vol = input_volume[..., 0].copy()
     else:
         b0vol = input_volume.copy()
-
     # Make a mask using a multiple pass median filter and histogram thresholding.
     mask = multi_median(b0vol, median_radius, numpass)
     thresh = otsu(mask)
-    mask = binary_threshold(mask, thresh)
-
+    mask = mask > thresh
     # Auto crop the volumes using the mask as input_volume for bounding box computing.
     if autocrop:
         mins, maxs = bounding_box(mask)
@@ -182,5 +181,50 @@ def median_otsu(input_volume, median_radius=4, numpass=4, autocrop=False, b0Slic
         maskedvolume = applymask(croppedvolume, mask)
     else:
         maskedvolume = applymask(input_volume, mask)
-
     return maskedvolume, mask
+
+
+def segment_from_cfa(tensor_fit, roi, threshold, return_cfa=False):
+    """
+    Segment the cfa inside roi using the values from threshold as bounds.
+
+    Parameters
+    -------------
+    tensor_fit : TensorFit object
+        TensorFit object
+
+    roi : ndarray
+        A binary mask, which contains the bounding box for the segmentation.
+
+    threshold : array-like
+        An iterable that defines the min and max values to use for the thresholding.
+        The values are specified as (R_min, R_max, G_min, G_max, B_min, B_max)
+
+    return_cfa : bool, optional
+        If True, the cfa is also returned.
+
+    Returns
+    ----------
+    mask : ndarray
+        Binary mask of the segmentation.
+
+    cfa : ndarray, optional
+        Array with shape = (..., 3), where ... is the shape of tensor_fit.
+        The color fractional anisotropy, ordered as a nd array with the last
+        dimension of size 3 for the R, G and B channels.
+    """
+
+    FA = fractional_anisotropy(tensor_fit.evals)
+    FA[np.isnan(FA)] = 0
+    FA = np.clip(FA, 0, 1)  # Clamp the FA to remove degenerate tensors
+
+    cfa = color_fa(FA, tensor_fit.evecs)
+    roi = np.asarray(roi, dtype=bool)
+
+    include = (cfa >= threshold[0::2]) & (cfa <= threshold[1::2]) & roi[..., None]
+    mask = np.all(include, axis=-1)
+
+    if return_cfa:
+        return mask, cfa
+
+    return mask

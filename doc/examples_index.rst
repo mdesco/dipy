@@ -8,10 +8,12 @@ Examples
    :maxdepth: 1
 
    note_about_examples
+   examples_built/brain_extraction_dwi
    examples_built/reconst_dti
    examples_built/reconst_csd
    examples_built/reconst_csa
    examples_built/reconst_dsi
+   examples_built/reconst_dsi_metrics
    examples_built/reconst_gqi
    examples_built/tracking_eudx_tensor
    examples_built/tracking_eudx_odf
@@ -20,7 +22,7 @@ Examples
    examples_built/segment_quickbundles
    examples_built/streamline_formats
    examples_built/warp_streamlines
-   examples_built/brain_extraction_dwi
+
 
 .. In order to build the examples, you'll need (on Debian)
     sudo apt-get install python-tables python-matplotib python-vtk

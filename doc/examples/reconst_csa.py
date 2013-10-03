@@ -48,7 +48,7 @@ from dipy.segment.mask import median_otsu
 maskdata, mask = median_otsu(data, 3, 2, True, range(0,10))
 
 """
-We instantiate our CSA model with sperical harmonic order of 4
+We instantiate our CSA model with spherical harmonic order of 4
 """
 
 order = 4
@@ -98,7 +98,7 @@ Let's visualize the ODFs of a small rectangular area in an axial slice of the
 splenium of the corpus callosum (CC).
 """
 
-data_small = data[20:50, 55:85, 38:39]
+data_small = maskdata[13:43, 44:74, 28:29]
 
 >>>>>>> 043eb360d57ad18ce5193a9c897b7441f2b161d4
 from dipy.data import get_sphere
@@ -116,7 +116,7 @@ fvtk.add(r, fvtk.sphere_funcs(csa_odfs, sphere, colormap='jet'))
 csaodfs = csamodel.fit(data_small).odf(sphere)
 
 """
-It is commong with CSA ODFs to produce negative values, we can remove those using ``np.clip``
+It is common with CSA ODFs to produce negative values, we can remove those using ``np.clip``
 """
 
 csaodfs = np.clip(csaodfs, 0, np.max(csaodfs, -1)[..., None])
