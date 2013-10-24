@@ -11,7 +11,7 @@ from dipy.reconst.csdeconv import (ConstrainedSphericalDeconvModel,
                                    odf_sh_to_sharp)
 from dipy.reconst.odf import peak_directions
 from dipy.core.sphere_stats import angular_similarity
-from dipy.reconst.shm import sf_to_sh, sh_to_sf, QballModel
+from dipy.reconst.shm import sf_to_sh, sh_to_sf, QballModel, CsaOdfModel
 
 
 def test_csdeconv():
@@ -104,6 +104,7 @@ def test_odfdeconv():
 
     ang_sim = angular_similarity(directions, directions2)
 
+
     assert_equal(ang_sim > 1.9, True)
 
     assert_equal(directions.shape[0], 2)
@@ -118,6 +119,75 @@ def test_odfdeconv():
 
         ConstrainedSDTModel(gtab, ratio, sh_order=8)
         assert_equal(len(w) > 0, False)
+
+
+
+def test_r2_term_odf_sh_to_sharp():
+
+    SNR = None
+    S0 = 1
+
+    _, fbvals, fbvecs = get_data('small_64D')  #get_data('small_64D')
+
+    bvals = np.load(fbvals)
+    bvecs = np.load(fbvecs)
+
+    sphere = get_sphere('symmetric724')
+
+    gtab = gradient_table(bvals, bvecs)
+    mevals = np.array(([0.0015, 0.0003, 0.0003],
+                       [0.0015, 0.0003, 0.0003]))
+
+    S, sticks = multi_tensor(gtab, mevals, S0, angles=[(0, 0), (90, 0)],
+                             fractions=[50, 50], snr=SNR)
+    
+    
+    mevecs = [all_tensor_evecs(sticks[0]).T,
+              all_tensor_evecs(sticks[1]).T]
+
+    odf_gt = multi_tensor_odf(sphere.vertices, [0.5, 0.5], mevals, mevecs)
+
+
+    csa = CsaOdfModel(gtab, sh_order=8, assume_normed=True)
+    
+    csafit = csa.fit(S)
+    odf_csa = csafit.odf(sphere)
+
+
+    odfs_sh3 = sf_to_sh(odf_csa, sphere, sh_order=8, basis_type=None)
+    fodf_sh3 = odf_sh_to_sharp(odfs_sh3, sphere, basis=None, ratio=3 / 15.,
+                              sh_order=8, lambda_=1., tau=0.1, r2_term=True)
+    
+
+    odfs_sh = sf_to_sh(odf_gt, sphere, sh_order=8, basis_type=None)
+    fodf_sh = odf_sh_to_sharp(odfs_sh, sphere, basis=None, ratio=3 / 15.,
+                              sh_order=8, lambda_=1., tau=0.1, r2_term=True)
+
+    fodf = sh_to_sf(fodf_sh, sphere, sh_order=8, basis_type=None)
+
+    fodf_sh2 = odf_sh_to_sharp(odfs_sh, sphere, basis=None, ratio=3 / 15.,
+                              sh_order=8, lambda_=1., tau=0.1, r2_term=False)
+
+    fodf2 = sh_to_sf(fodf_sh2, sphere, sh_order=8, basis_type=None)
+    fodf3 = sh_to_sf(fodf_sh3, sphere, sh_order=8, basis_type=None)
+
+    from dipy.viz import fvtk
+    r = fvtk.ren()
+    fvtk.add( r, fvtk.sphere_funcs( np.vstack((fodf, fodf2, odf_gt, fodf3)), sphere ))
+    fvtk.show( r )
+    
+    directions_gt, _, _ = peak_directions(odf_gt, sphere)
+    directions, _, _ = peak_directions(fodf, sphere)
+    directions2, _, _ = peak_directions(fodf2, sphere)
+    directions3, _, _ = peak_directions(fodf3, sphere)
+    
+    ang_sim = angular_similarity(directions_gt, directions)
+    assert_equal(ang_sim > 1.9, True)
+    ang_sim = angular_similarity(directions_gt, directions3)
+    assert_equal(ang_sim > 1.9, True)
+    ang_sim = angular_similarity(directions_gt, directions2)
+    assert_equal(ang_sim > 1.9, True)
+
 
 
 def test_odf_sh_to_sharp():
@@ -164,6 +234,5 @@ def test_odf_sh_to_sharp():
 
 
 if __name__ == '__main__':
-    run_module_suite()
-
-
+    #run_module_suite()
+    test_r2_term_odf_sh_to_sharp()
