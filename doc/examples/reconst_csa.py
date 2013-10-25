@@ -92,6 +92,7 @@ Finally lets try to visualize the orientation distribution functions for a small
 region of interest (ROI) part of the splenium of the corpus callosum (CC).
 """
 
+<<<<<<< HEAD
 data_small  = data[20:50,55:85, 38:39] 
 =======
 Let's visualize the ODFs of a small rectangular area in an axial slice of the
@@ -123,6 +124,12 @@ csaodfs = np.clip(csaodfs, 0, np.max(csaodfs, -1)[..., None])
 
 fvtk.add(r, fvtk.sphere_funcs(csaodfs, sphere, colormap='jet'))
 >>>>>>> 043eb360d57ad18ce5193a9c897b7441f2b161d4
+=======
+data_small  = data[20:50,55:85, 38:39]
+
+fvtk.add(r, fvtk.sphere_funcs(csamodel.fit(data_small).odf(sphere),
+                              sphere, colormap='jet'))
+>>>>>>> 857d880fdc02ca9058cc338b409e36f1846923f0
 print('Saving illustration as csa_odfs.png')
 fvtk.record(r, n_frames=1, out_path='csa_odfs.png', size=(600, 600))
 
