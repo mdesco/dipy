@@ -333,7 +333,10 @@ def forward_sdt_deconv_mat(ratio, sh_order, r2_term=False):
         spherical harmonic order
     r2_term : bool
         True if ODF comes from an ODF computed from a model using the r^2 term in the integral.
-        For example, DSI, GQI, SHORE, CSA, Tensor, Multi-tensor ODFs.
+        For example, DSI, GQI, SHORE, CSA, Tensor, Multi-tensor ODFs. This results in using
+        the proper analytical response function solution solving from the single-fiber ODF
+        with the r^2 term. This derivation is not published anywhere. 
+        Please contact m.descoteaux@usherbrooke.ca or garyfallidis@gmail.com for the Math.
 
     Returns
     -------
@@ -345,7 +348,7 @@ def forward_sdt_deconv_mat(ratio, sh_order, r2_term=False):
     m, n = sph_harm_ind_list(sh_order)
 
     sdt = np.zeros(m.shape) # SDT matrix
-    frt = np.zeros(m.shape) # FRT (Funk-Radon transform) q-ball matrix
+    frt = np.zeros(m.shape) # FRT (Funk-Radon transform)
     b = np.zeros(m.shape)
     bb = np.zeros(m.shape)
 
@@ -353,7 +356,6 @@ def forward_sdt_deconv_mat(ratio, sh_order, r2_term=False):
         from scipy.integrate import quad
 
         if r2_term :                        
-            # Gamma(3/2) * sqrt(ratio) / srqt(4pi^3) (1 - (1-ratio)*z*z)^(-3/2)
             sharp = quad(lambda z: lpn(l, z)[0][-1] * gamma(1.5) * np.sqrt( ratio / (4 * np.pi ** 3) ) /
                          np.power((1 - (1 - ratio) * z ** 2), 1.5), -1., 1.)
         else :
@@ -496,7 +498,9 @@ def odf_deconv(odf_sh, sh_order, R, B_reg, lambda_=1., tau=0.1, r2_term=False):
 
     fodf = np.dot(B_reg, fodf_sh)
 
-    if ~r2_term : # if sharpening a q-ball odf (it is properly normalized), we need to force normalization
+    # if sharpening a q-ball odf (it is NOT properly normalized), we need to force normalization
+    # otherwise, for DSI, CSA, SHORE, Tensor odfs, they are normalized by construction
+    if ~r2_term : 
         Z = np.linalg.norm(fodf)
         fodf_sh /= Z
 
@@ -555,7 +559,7 @@ def odf_sh_to_sharp(odfs_sh, sphere, basis=None, ratio=3 / 15., sh_order=8, lamb
         tau parameter in the L matrix construction (see odfdeconv) (default 0.1)
     r2_term : bool
         True if you want the proper analytical r^2 ODF response function solution to be used.
-        Default False as in [1]_, used to sharpen the q-ball ODF. 
+        Default is False as in [1]_, used to sharpen the q-ball ODF. 
         Should be true if you are sharpening an ODF coming from GQI, DSI, CSA, SHORE, 
         Tensor, Multi-Tensor, which all use the true ODF integral with the r^2 term to compute the ODF, 
         as opposed to q-ball imaging [2]_, [3]_.
