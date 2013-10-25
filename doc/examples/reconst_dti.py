@@ -209,23 +209,6 @@ MD2 = tenfit.md
 """
 Obviously, the quantities are identical.
 
-<<<<<<< HEAD
-We can also compute the colored FA or RGB-map [Pajevic1999]_. First, we make sure 
-that the FA is scaled between 0 and 1, we compute the RGB map and save it.
-"""
-
-FA = np.clip(FA, 0, 1)
-RGB = color_fa(FA, tenfit.evecs)
-nib.save(nib.Nifti1Image(np.array(255 * RGB, 'uint8'), img.get_affine()), 'tensor_rgb.nii.gz')
-
-"""
-Finally lets try to visualize the orientation distribution functions of a small
-rectangular in an axial slice of the splenium of the corpus callosum (CC).
-"""
-
-print('Computing tensor ODFs in a part of the splenium of the CC')
-data_small  = data[20:50,55:85, 38:39]
-=======
 We can also compute the colored FA or RGB-map [Pajevic1999]_. First, we make sure
 that the FA is scaled between 0 and 1, we compute the RGB map and save it.
 """
@@ -241,16 +224,10 @@ area in an axial slice of the splenium of the corpus callosum (CC).
 
 print('Computing tensor ellipsoids in a part of the splenium of the CC')
 
->>>>>>> 043eb360d57ad18ce5193a9c897b7441f2b161d4
 from dipy.data import get_sphere
 sphere = get_sphere('symmetric724')
 
 from dipy.viz import fvtk
-<<<<<<< HEAD
-r = fvtk.ren()
-fvtk.add(r, fvtk.sphere_funcs(tenmodel.fit(data_small).odf(sphere),
-							  sphere, colormap=None))
-=======
 ren = fvtk.ren()
 
 evals = tenfit.evals[13:43, 44:74, 28:29]
@@ -286,7 +263,6 @@ for the same area as we did with the ellipsoids.
 tensor_odfs = tenmodel.fit(data[20:50, 55:85, 38:39]).odf(sphere)
 
 fvtk.add(ren, fvtk.sphere_funcs(tensor_odfs, sphere, colormap=None))
->>>>>>> 043eb360d57ad18ce5193a9c897b7441f2b161d4
 #fvtk.show(r)
 print('Saving illustration as tensor_odfs.png')
 fvtk.record(ren, n_frames=1, out_path='tensor_odfs.png', size=(600, 600))
@@ -312,15 +288,9 @@ other examples.
 .. [Basser1994] Basser PJ, Mattielo J, LeBihan (1994). MR diffusion tensor
                 spectroscopy and imaging.
 
-<<<<<<< HEAD
-.. [Pajevic1999] Pajevic S, Pierpaoli (1999). Color schemes to represent 
-                 the orientation of anisotropic tissues from diffusion tensor 
-                 data: application to white matter fiber tract mapping in 
-=======
 .. [Pajevic1999] Pajevic S, Pierpaoli (1999). Color schemes to represent
                  the orientation of anisotropic tissues from diffusion tensor
                  data: application to white matter fiber tract mapping in
->>>>>>> 043eb360d57ad18ce5193a9c897b7441f2b161d4
                  the human brain.
 
 .. include:: ../links_names.inc
