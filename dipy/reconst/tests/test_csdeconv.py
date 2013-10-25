@@ -13,10 +13,7 @@ from dipy.reconst.odf import peak_directions
 from dipy.core.sphere_stats import angular_similarity
 from dipy.reconst.shm import sf_to_sh, sh_to_sf, QballModel, CsaOdfModel
 from dipy.reconst.dsi import DiffusionSpectrumModel
-from dipy.data.fetcher import fetch_isbi2013_2shell, read_isbi2013_2shell
 from dipy.reconst.gqi import GeneralizedQSamplingModel
-#from dipy.reconst.shore import ShoreModel
-                              
 
 def test_csdeconv():
     SNR = 100
