@@ -7,6 +7,7 @@
 .. autosummary::
     :toctree:
 
+    csdeconv
     dsi
     dti
     gqi
