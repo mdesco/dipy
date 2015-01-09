@@ -570,8 +570,8 @@ def test_restore():
              this_y[:, drop_this] = 1.0
              for sigma in [67.0, np.ones(this_y.shape[-1]) *67.0]:
                  tensor_model = dti.TensorModel(gtab, fit_method='restore',
-                                            jac=jac,
-                                            sigma=67.0)
+                                                jac=jac,
+                                                sigma=67.0)
 
                  tensor_est = tensor_model.fit(this_y)
                  assert_array_almost_equal(tensor_est.evals[0], evals, decimal=3)
