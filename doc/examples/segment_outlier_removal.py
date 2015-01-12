@@ -189,15 +189,14 @@ def outliers_removal_using_hierarchical_quickbundles(streamlines, confidence=0.9
     return summary
 
 
-def apply_on_specific_bundle(streamlines, confidence):
+def apply_on_specific_bundle(streamlines, confidence, alpha):
     from dipy.viz import fvtk
     rstreamlines = set_number_of_points(streamlines, 20)
 
     summary = outliers_removal_using_hierarchical_quickbundles(rstreamlines, confidence=confidence, debug=False)
-    #summary = automatic_outliers_removal_inception_proba(rstreamlines, vizu_qb.metric, agressivity=alpha, confidence=0.95, nb_thresholds_max=20, nb_samplings_max=nb_samplings_max)
+    #summary = automatic_outliers_removal_inception_proba(Rstreamlines, vizu_qb.metric, agressivity=alpha, confidence=0.95, nb_thresholds_max=20, nb_samplings_max=nb_samplings_max)
 
     # something between 0.15 and 0.3 seems reasonable
-    alpha = 0.2
     outliers, rest = prune(rstreamlines, alpha, summary)
 
     outliers_cluster = Cluster(indices=outliers, refdata=streamlines)
@@ -289,8 +288,12 @@ if __name__ == '__main__':
     if len(sys.argv) > 2:
         confidence = float(sys.argv[2])
     
+    alpha = 0.2
+    if len(sys.argv) > 3:
+        alpha = float(sys.argv[3])
+
     streamlines, colors, properties, in_name, hdr = load_specific_bundle(sys.argv[1])
-    rest_cluster, outliers_cluster = apply_on_specific_bundle(streamlines, confidence)        
+    rest_cluster, outliers_cluster = apply_on_specific_bundle(streamlines, confidence, alpha)        
     
     fileName, fileExtension = os.path.splitext(in_name)
     #print(fileName, fileExtension)
