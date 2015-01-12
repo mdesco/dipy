@@ -1,6 +1,10 @@
 import sys
+import os
 import readline
 import numpy as np
+import pylab as plt
+import nibabel as nib
+
 from time import time
 
 from scipy.special import ndtri
@@ -115,19 +119,22 @@ def prune(streamlines, threshold, features, refdata=None):
 
         # Show outliers streamlines vs. the ones we kept
         if len(outlier_indices) > 0 and len(rest_indices) > 0:
-            show_clusters_grid_view([clusters_outliers, [outliers_cluster, rest_cluster], clusters_rest], grid_of_clusters=True)
+            show_clusters_grid_view([clusters_outliers, [outliers_cluster, rest_cluster], clusters_rest], 
+                                    grid_of_clusters=True)
         else:
             show_clusters_grid_view([clusters_outliers, clusters_rest], grid_of_clusters=True)
 
     return outlier_indices, rest_indices
 
 
-def outliers_removal_using_hierarchical_quickbundles(streamlines, confidence=0.95, min_threshold=0.5, nb_samplings_max=30):
+def outliers_removal_using_hierarchical_quickbundles(streamlines, confidence=0.95, 
+                                                     min_threshold=0.5, nb_samplings_max=30, debug=False):
     sterror_factor = ndtri(confidence)
     metric = "mdf"
 
     box_min, box_max = get_streamlines_bounding_box(streamlines)
-    #initial_threshold = np.sqrt(np.sum((box_max - box_min)**2)) / 4.  # Half of the bounding box's halved diagonal length.
+    #initial_threshold = np.sqrt(np.sum((box_max - box_min)**2)) / 4.  
+    # Half of the bounding box's halved diagonal length.
     initial_threshold = np.min(np.abs(box_max - box_min)) / 2.
 
     # Quickbundle's threshold is halved between hierarchical level.
@@ -144,7 +151,9 @@ def outliers_removal_using_hierarchical_quickbundles(streamlines, confidence=0.9
         cluster_orderings = [ordering]
         for j, threshold in enumerate(thresholds):
             id_cluster = 0
-            print "Ordering #{0}, QB/{2}mm, {1} clusters to process".format(i+1, len(cluster_orderings), threshold)
+            if debug :
+                print "Ordering #{0}, QB/{2}mm, {1} clusters to process".format(i+1, len(cluster_orderings), 
+                                                                                threshold)
 
             next_cluster_orderings = []
             qb = QuickBundles(metric=metric, threshold=threshold)
@@ -160,15 +169,18 @@ def outliers_removal_using_hierarchical_quickbundles(streamlines, confidence=0.9
 
             cluster_orderings = next_cluster_orderings
 
-        print "{} qb done in {:.2f} sec on {} streamlines".format(nb_clusterings, time()-start_time, len(streamlines))
+        if debug :
+            print "{} qb done in {:.2f} sec on {} streamlines".format(nb_clusterings, time()-start_time, 
+                                                                      len(streamlines))
 
         #path_lengths_per_streamline = np.sum(T[:, None]*(streamlines_path == -1), axis=1)
         path_lengths_per_streamline = np.sum((streamlines_path != -1), axis=1)[:, :i]
 
         # Compute confidence interval on mean cluster's size for each streamlines
         sterror_path_length_per_streamline = np.std(path_lengths_per_streamline, axis=1, ddof=1) / np.sqrt(i+1)
-        print "Avg. sterror:", sterror_factor*sterror_path_length_per_streamline.mean()
-        print "Max. sterror:", sterror_factor*sterror_path_length_per_streamline.max()
+        if debug :
+            print "Avg. sterror:", sterror_factor*sterror_path_length_per_streamline.mean()
+            print "Max. sterror:", sterror_factor*sterror_path_length_per_streamline.max()
 
         if sterror_factor*sterror_path_length_per_streamline.mean() < 0.5:
             break
@@ -181,34 +193,93 @@ def apply_on_specific_bundle(streamlines, confidence):
     from dipy.viz import fvtk
     rstreamlines = set_number_of_points(streamlines, 20)
 
-    summary = outliers_removal_using_hierarchical_quickbundles(rstreamlines, confidence=confidence)
+    summary = outliers_removal_using_hierarchical_quickbundles(rstreamlines, confidence=confidence, debug=False)
     #summary = automatic_outliers_removal_inception_proba(rstreamlines, vizu_qb.metric, agressivity=alpha, confidence=0.95, nb_thresholds_max=20, nb_samplings_max=nb_samplings_max)
 
-    import pylab as plt
-    plt.hist(summary, bins=100)
-    plt.show(False)
+    # something between 0.15 and 0.3 seems reasonable
+    alpha = 0.2
+    outliers, rest = prune(rstreamlines, alpha, summary)
 
-    while True:
-        print "---\nNew prunning threshold:",
-        alpha = float(raw_input())
+    outliers_cluster = Cluster(indices=outliers, refdata=streamlines)
+    rest_cluster = Cluster(indices=rest, refdata=streamlines)
+    
+    # this part is for the interactive mode
+    interactive = False
+    if interactive :
+        plt.hist(summary, bins=100)
+        plt.show(False)
 
-        outliers, rest = prune(rstreamlines, alpha, summary)
-        print "Pruned {0} out of {1} streamlines at {2:.2f}%".format(len(outliers), len(streamlines), alpha*100)
+        while True:
+            print "---\nNew prunning threshold:",
+            alpha = float(raw_input())
 
-        outliers_cluster = Cluster(indices=outliers, refdata=streamlines)
-        rest_cluster = Cluster(indices=rest, refdata=streamlines)
-        show_clusters_grid_view([rest_cluster, outliers_cluster], colormap=[fvtk.colors.green, fvtk.colors.orange_red])
-        show_clusters([rest_cluster, outliers_cluster], colormap=[fvtk.colors.green, fvtk.colors.orange_red])
-        show_clusters([rest_cluster], colormap=[fvtk.colors.orange_red])
+            outliers, rest = prune(rstreamlines, alpha, summary)
+            print "Pruned {0} out of {1} streamlines at {2:.2f}%".format(len(outliers), 
+                                                                         len(streamlines), alpha*100)
+
+            outliers_cluster = Cluster(indices=outliers, refdata=streamlines)
+            rest_cluster = Cluster(indices=rest, refdata=streamlines)
+            show_clusters_grid_view([rest_cluster, outliers_cluster], 
+                                    colormap=[fvtk.colors.green, fvtk.colors.orange_red])
+            show_clusters([rest_cluster, outliers_cluster], colormap=[fvtk.colors.green, fvtk.colors.orange_red])
+            show_clusters([rest_cluster], colormap=[fvtk.colors.orange_red])
+
+    return rest_cluster, outliers_cluster
 
 
 def load_specific_bundle(bundlename):
-    import nibabel as nib
-    dname = '/home/marc/research/data/streamlines/ismrm/'
+    dname = '/Users/desm2239/Research/Data/Cunnane/Az_prob/09-043-0002-RR/work/results/'
     fname = dname + 'bundles_{}.trk'.format(bundlename)
 
     streams, hdr = nib.trackvis.read(fname)
-    return [i[0] for i in streams]
+    streamlines = [i[0] for i in streams]
+    colors = [i[1] for i in streams]
+    properties = [i[2] for i in streams]
+    return streamlines, colors, properties, fname, hdr
+
+
+def _hsv_to_rgb(h, s, v):
+    h_i = int(h*6)
+    f = h*6 - h_i
+    p = v * (1-s)
+    q = v * (1-f*s)
+    t = v * (1 - (1-f) * s)
+    if h_i == 0:
+        r, g, b = v, t, p
+    if h_i == 1:
+        r, g, b = q, v, p
+    if h_i == 2:
+        r, g, b = p, v, t
+    if h_i == 3:
+        r, g, b = p, q, v
+    if h_i == 4:
+        r, g, b = t, p, v
+    if h_i == 5:
+        r, g, b = v, p, q
+    return [int(r*256), int(g*256), int(b*256)]
+
+def save_streamlines_with_color(streamlines, color, out_file, hdr):
+    trk = []
+    properties = None
+    for i, streamline in enumerate(streamlines):
+        scalars = np.array([color] * len(streamline))
+        trk.append((streamline, scalars, properties))
+
+    nib.trackvis.write(out_file, trk, hdr)
+
+def save_specific_cluster(cluster, fname, hdr):
+    streamlines = list(cluster)
+    
+    new_hdr = nib.trackvis.empty_header()
+    new_hdr['voxel_size'] = hdr['voxel_size']
+    new_hdr['voxel_order'] = hdr['voxel_order']
+    new_hdr['dim'] = hdr['dim']
+    new_hdr['n_count'] = len(streamlines)
+
+    colormap = _hsv_to_rgb(0.5, 0.99, 0.99)
+    
+    # this is a hack because I don't know how to properly save streamlines...
+    save_streamlines_with_color(streamlines, colormap, fname, new_hdr)        
 
 
 if __name__ == '__main__':
@@ -217,6 +288,27 @@ if __name__ == '__main__':
     confidence = 0.95
     if len(sys.argv) > 2:
         confidence = float(sys.argv[2])
-
-    streamlines = load_specific_bundle(sys.argv[1])
-    apply_on_specific_bundle(streamlines, confidence)
+    
+    streamlines, colors, properties, in_name, hdr = load_specific_bundle(sys.argv[1])
+    rest_cluster, outliers_cluster = apply_on_specific_bundle(streamlines, confidence)        
+    
+    fileName, fileExtension = os.path.splitext(in_name)
+    #print(fileName, fileExtension)
+    
+    dirname = os.path.split(os.path.abspath(in_name))[0]
+    filename = os.path.split(os.path.abspath(in_name))[1]
+    fileNameNoExt, fileExtension = os.path.splitext(filename)
+    
+    from subprocess import call
+    call(["mkdir", "outliers"])
+    
+    # how do we get the color of the actual TRK to save the same color?
+    save_specific_cluster(rest_cluster, 
+                          dirname + '/outliers/' + fileNameNoExt + '_clean' + fileExtension, hdr)
+    save_specific_cluster(outliers_cluster, 
+                          dirname + '/outliers/' + fileNameNoExt + '_outliers' + fileExtension, hdr)
+    
+    
+    
+    
+    
