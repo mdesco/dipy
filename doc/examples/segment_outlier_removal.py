@@ -48,7 +48,7 @@ def show_clusters(clusters, colormap=None, cam_pos=None,
 
 def show_clusters_grid_view(clusters, colormap=None, makelabel=None, grid_of_clusters=False,
                             cam_pos=None, cam_focal=None, cam_view=None,
-                            magnification=1, fname=None, size=(900, 900)):
+                            magnification=1, fname=None, size=(900, 900), oname=''):
 
     from dipy.viz import fvtk
     from dipy.viz.axycolor import distinguishable_colormap
@@ -99,7 +99,10 @@ def show_clusters_grid_view(clusters, colormap=None, makelabel=None, grid_of_clu
 
             fvtk.label(ren, text=label, pos=text_pos, scale=text_scale, color=(0, 0, 0))
 
-    fvtk.show(ren, size=size)
+    if oname == '':
+        fvtk.show(ren, size=size)
+    else :
+        fvtk.record(ren, out_path=oname, size=size)
 
 
 def prune(streamlines, threshold, features, refdata=None):
@@ -189,7 +192,7 @@ def outliers_removal_using_hierarchical_quickbundles(streamlines, confidence=0.9
     return summary
 
 
-def apply_on_specific_bundle(streamlines, confidence, alpha):
+def apply_on_specific_bundle(streamlines, confidence, alpha, oname1, oname2):
     from dipy.viz import fvtk
     rstreamlines = set_number_of_points(streamlines, 20)
 
@@ -201,9 +204,17 @@ def apply_on_specific_bundle(streamlines, confidence, alpha):
 
     outliers_cluster = Cluster(indices=outliers, refdata=streamlines)
     rest_cluster = Cluster(indices=rest, refdata=streamlines)
-    
+
+    show_clusters_grid_view([rest_cluster, outliers_cluster], 
+                            colormap=[fvtk.colors.green, fvtk.colors.orange_red],
+                            oname=oname1)
+
+    plt.hist(summary, bins=100)
+    plt.savefig(oname2)
+    plt.close()
+
     # this part is for the interactive mode
-    interactive = False
+    interactive = True
     if interactive :
         plt.hist(summary, bins=100)
         plt.show(False)
@@ -227,8 +238,9 @@ def apply_on_specific_bundle(streamlines, confidence, alpha):
 
 
 def load_specific_bundle(bundlename):
-    dname = '/Users/desm2239/Research/Data/Cunnane/Az_prob/09-043-0002-RR/work/results/'
-    fname = dname + 'bundles_{}.trk'.format(bundlename)
+    #dname = '/Users/desm2239/Research/Data/Cunnane/Az_prob/09-043-0002-RR/work/results/'
+    #fname = dname + 'bundles_{}.trk'.format(bundlename)
+    fname = bundlename
 
     streams, hdr = nib.trackvis.read(fname)
     streamlines = [i[0] for i in streams]
@@ -292,16 +304,21 @@ if __name__ == '__main__':
     if len(sys.argv) > 3:
         alpha = float(sys.argv[3])
 
+
     streamlines, colors, properties, in_name, hdr = load_specific_bundle(sys.argv[1])
-    rest_cluster, outliers_cluster = apply_on_specific_bundle(streamlines, confidence, alpha)        
     
     fileName, fileExtension = os.path.splitext(in_name)
-    #print(fileName, fileExtension)
-    
+    #print(fileName, fileExtension)    
     dirname = os.path.split(os.path.abspath(in_name))[0]
     filename = os.path.split(os.path.abspath(in_name))[1]
-    fileNameNoExt, fileExtension = os.path.splitext(filename)
+    fileNameNoExt, fileExtension = os.path.splitext(filename)    
+    oname2 = dirname + '/outliers/' + fileNameNoExt + '_outliers_hist.png'
+    oname1 = dirname + '/outliers/' + fileNameNoExt + '_outliers.png'
+
+    rest_cluster, outliers_cluster = apply_on_specific_bundle(streamlines, confidence, alpha, 
+                                                              oname1, oname2)        
     
+
     from subprocess import call
     call(["mkdir", "outliers"])
     
