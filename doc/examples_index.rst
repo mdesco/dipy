@@ -113,6 +113,7 @@ Fiber tracking (NEW - Experimental)
 - :ref:`example_introduction_to_basic_tracking`
 - :ref:`example_probabilistic_fiber_tracking`
 - :ref:`example_deterministic_fiber_tracking`
+- :ref:`example_tracking_tissue_classifier`
 - :ref:`example_sfm_tracking`
 
 ---------------
@@ -123,7 +124,7 @@ Fiber tracking
 - :ref:`example_tracking_eudx_odf`
 
 -------------------------------------
-Fiber tracking validation (NEW)
+Fiber tracking validation
 -------------------------------------
 
 - :ref:`example_linear_fascicle_evaluation`
@@ -138,7 +139,7 @@ Streamline analysis and connectivity
 
 
 ------------------
-Registration (NEW)
+Registration
 ------------------
 
 Image-based Registration
