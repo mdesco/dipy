@@ -8,7 +8,6 @@ from .recspeed import local_maxima, remove_similar_vertices
 
 
 class GeneralizedQSamplingModel(OdfModel, Cache):
-
     def __init__(self,
                  gtab,
                  method='gqi2',
@@ -38,6 +37,13 @@ class GeneralizedQSamplingModel(OdfModel, Cache):
 
         .. [2] Garyfallidis E, "Towards an accurate brain tractography", PhD
         thesis, University of Cambridge, 2012.
+        
+        Notes
+        -----
+        As of version 0.9, range of the sampling length in GQI2 has changed
+	to match the same scale used in the 'standard' method [1]_. This 
+        means that the value of `sampling_length` should be approximately 
+        1 - 1.3 (see [1]_, pg. 1628). 
 
         Examples
         --------
@@ -50,29 +56,25 @@ class GeneralizedQSamplingModel(OdfModel, Cache):
         >>> from dipy.core.subdivide_octahedron import create_unit_sphere 
         >>> sphere = create_unit_sphere(5)
         >>> from dipy.reconst.gqi import GeneralizedQSamplingModel
-        >>> gq = GeneralizedQSamplingModel(gtab, 'gqi2', 1.4)
+        >>> gq = GeneralizedQSamplingModel(gtab, 'gqi2', 1.1)
         >>> voxel_signal = data[0, 0, 0]
         >>> odf = gq.fit(voxel_signal).odf(sphere)
 
         See Also
         --------
-        dipy.reconst.gqi.DiffusionSpectrumModel
+        dipy.reconst.dsi.DiffusionSpectrumModel
 
         """
-        bvals = gtab.bvals
-        gradients = gtab.bvecs
+        OdfModel.__init__(self, gtab)
         self.method = method
         self.Lambda = sampling_length
         self.normalize_peaks = normalize_peaks
         # 0.01506 = 6*D where D is the free water diffusion coefficient
         # l_values sqrt(6 D tau) D free water diffusion coefficient and
         # tau included in the b-value
-        scaling = np.sqrt(bvals * 0.01506)
+        scaling = np.sqrt(self.gtab.bvals * 0.01506)
         tmp = np.tile(scaling, (3, 1))
-        #the b vectors might have nan values where they correspond to b
-        #value equals with 0
-        gradients[np.isnan(gradients)] = 0.
-        gradsT = gradients.T
+        gradsT = self.gtab.bvecs.T
         b_vector = gradsT * tmp # element-wise product
         self.b_vector = b_vector.T
 
@@ -94,8 +96,7 @@ class GeneralizedQSamplingFit(OdfFit):
             signal values
 
         """
-        self.model = model
-        self.data = data
+        OdfFit.__init__(self, model, data)
         self._gfa = None
         self.npeaks = 5
         self._peak_values = None
@@ -110,11 +111,9 @@ class GeneralizedQSamplingFit(OdfFit):
             if self.model.method == 'gqi2':
                 H=squared_radial_component
                 #print self.gqi_vector.shape
-                self.gqi_vector = np.real(H(np.dot(self.model.b_vector, 
-                                        sphere.vertices.T) * self.model.Lambda / np.pi))
+                self.gqi_vector = np.real(H(np.dot(self.model.b_vector,                                         sphere.vertices.T) * self.model.Lambda))
             if self.model.method == 'standard':
-                self.gqi_vector = np.real(np.sinc(np.dot(self.model.b_vector, 
-                                        sphere.vertices.T) * self.model.Lambda / np.pi))
+                self.gqi_vector = np.real(np.sinc(np.dot(self.model.b_vector,                                   sphere.vertices.T) * self.model.Lambda / np.pi))
             self.model.cache_set('gqi_vector', sphere, self.gqi_vector)
 
         return np.dot(self.data, self.gqi_vector)

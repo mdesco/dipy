@@ -4,34 +4,55 @@
 Diffusion Imaging In Python
 ###########################
 
-Dipy_ is a **free** and **open source** software project for
-**diffusion** *magnetic resonance imaging* (dMRI) **analysis**. 
+Dipy_ is a **free** and **open source** software project focusing mainly on **diffusion** *magnetic resonance imaging* (dMRI) analysis.
+Nonetheless, as we solve problems in dMRI some of the solutions are applicable to the greater medical imaging and image processing communities.
+See for example our registration and denoising tutorials.
 
 
 **********
 Highlights
 **********
 
-In Dipy_ we care about methods which can solve complex problems efficiently and
-robustly. QuickBundles is one of the many state-of-the art algorithms found
-in Dipy_. It can be used to simplify large datasets of streamlines. See our
-:ref:`gallery <examples>` of examples and try QuickBundles with your data. Here is a
-video of QuickBundles applied on a simple dataset.
+**Dipy** is an **official exhibitor** for OHBM 2015. Come and meet us!
 
-.. raw:: html
+.. raw :: html
 
-    <iframe width="420" height="315" src="http://www.youtube.com/embed/kstL7KKqu94" frameborder="0" allowfullscreen></iframe>
+	<div style="width: 80% max-width=800px">
+		<a href="http://www.frontiersin.org/Neuroinformatics/10.3389/fninf.2014.00008/abstract" target="_blank"><img alt=" " class="align-center" src="_static/hbm2015_exhibitors.jpg" style="width: 90%;max-height: 90%">
+        </a>
+	</div>
+
+
+**Dipy 0.9.2** is now available for :ref:`download <installation>`. Here is a summary of the new features.
+
+* Anatomically Constrained Tissue Classifiers for Tracking
+* Massive speedup of Constrained Spherical Deconvolution (CSD)
+* Recursive calibration of response function for CSD
+* New experimental framework for clustering
+* Improvements and 10X speedup for Quickbundles
+* Improvements in Linear Fascicle Evaluation (LiFE)
+* New implementation of Geodesic Anisotropy 
+* New efficient transformation functions for registration
+* Sparse Fascicle Model supports acquisitions with multiple b-values
+
+See :ref:`older highlights <old_highlights>`.
 
 
 *************
 Announcements
 *************
-- **Spherical Deconvolution** algorithms are now included in the current development version 0.7.0dev. See the examples in :ref:`gallery <examples>`, 24 June 2013. 
-- A team of Dipy developers **wins** the `IEEE ISBI HARDI challenge <http://hardi.epfl.ch/static/events/2013_ISBI/workshop.html#results>`_, 7 April, 2013.  
-- **Hands on Dipy** seminar took place at the dMRI course of the CREATE-MIA summer school, 5-7 June, McGill, Montreal, 2013.
-- **Dipy 0.6.0** Released!, 30 March, 2013.
-- **Dipy 3rd Sprint**, Berkeley, CA, 8-18 April, 2013.
-- **IEEE ISBI HARDI challenge** 2013 chooses **Dipy**, February, 2013.
+
+- **Dipy 0.9.2** released, March 18th, 2015.
+- The creators of Dipy_ will attend both ISMRM and HBM 2015. Come and meet us!
+- **Dipy 0.8.0** released, 6 January, 2015.
+- Dipy_ will be an official exhibitor in `HBM 2015 <http://ohbm.loni.usc.edu>`_. Don't miss our booth!
+- Dipy was featured in `The Scientist Magazine <http://www.the-scientist.com/?articles.view/articleNo/41266/title/White-s-the-Matter>`_, Nov, 2014.
+- `Dipy paper`_ accepted in Frontiers of Neuroinformatics, January 22nd, 2014.
+- **Dipy 0.7.1** Released!, January 16th, 2014.
+- **Dipy 0.7.0** Released!, December 23rd, 2013.
+- A team of Dipy developers **wins** the `IEEE ISBI HARDI challenge <http://hardi.epfl.ch/static/events/2013_ISBI/workshop.html#results>`_, 7 April, 2013.
+
+See some of our :ref:`past announcements <old_news>`
 
 
 ***************
@@ -70,12 +91,7 @@ As an exercise try to calculate the `color FA` with your datasets. Here is how
 a slice should look like.
 
 .. image:: _static/colorfa.png
-
-
-We recommend to copy and paste this example in an IPython_ console. IPython_ helps interacting with the datasets easily. For example it is easy to find the size of the
-dataset which is given by `data.shape`.
-
-:ref:`Download <installation>` Dipy_ and try it for yourself.
+    :align: center
 
 **********
 Next Steps

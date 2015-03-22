@@ -4,8 +4,8 @@ Read test or example data
 
 from __future__ import division, print_function, absolute_import
 
-
 import sys
+import json
 
 from nibabel import load
 from dipy.io.bvectxt import read_bvec_file
@@ -25,8 +25,8 @@ else:  # Python 3
 
 import gzip
 import numpy as np
-from dipy.core.gradients import gradient_table
-from dipy.core.sphere import Sphere
+from dipy.core.gradients import GradientTable, gradient_table
+from dipy.core.sphere import Sphere, HemiSphere
 from dipy.sims.voxel import SticksAndBall
 import numpy as np
 from dipy.data.fetcher import (fetch_scil_b0,
@@ -38,15 +38,26 @@ from dipy.data.fetcher import (fetch_scil_b0,
                                fetch_sherbrooke_3shell,
                                read_sherbrooke_3shell,
                                fetch_isbi2013_2shell,
-                               read_isbi2013_2shell)
+                               read_isbi2013_2shell,
+                               read_stanford_labels,
+                               fetch_syn_data,
+                               read_syn_data,
+                               fetch_stanford_t1,
+                               read_stanford_t1,
+                               fetch_stanford_pve_maps,
+                               read_stanford_pve_maps)
 
 from ..utils.arrfuncs import as_native_array
+from dipy.tracking.streamline import relist_streamlines
+
 
 THIS_DIR = dirname(__file__)
 SPHERE_FILES = {
     'symmetric362': pjoin(THIS_DIR, 'evenly_distributed_sphere_362.npz'),
     'symmetric642': pjoin(THIS_DIR, 'evenly_distributed_sphere_642.npz'),
-    'symmetric724': pjoin(THIS_DIR, 'evenly_distributed_sphere_724.npz')
+    'symmetric724': pjoin(THIS_DIR, 'evenly_distributed_sphere_724.npz'),
+    'repulsion724': pjoin(THIS_DIR, 'repulsion724.npz'),
+    'repulsion100': pjoin(THIS_DIR, 'repulsion100.npz')
 }
 
 
@@ -138,6 +149,8 @@ def get_sphere(name='symmetric362'):
         * 'symmetric362'
         * 'symmetric642'
         * 'symmetric724'
+        * 'repulsion724'
+        * 'repulsion100'
 
     Returns
     -------
@@ -168,6 +181,10 @@ def get_sphere(name='symmetric362'):
                   faces=as_native_array(res['faces']))
 
 
+default_sphere = HemiSphere.from_sphere(get_sphere('symmetric724'))
+small_sphere = HemiSphere.from_sphere(get_sphere('symmetric362'))
+
+
 def get_data(name='small_64D'):
     """ provides filenames of some test datasets or other useful parametrisations
 
@@ -181,6 +198,10 @@ def get_data(name='small_64D'):
         'fornix' 300 tracks in Trackvis format (from Pittsburgh Brain Competition)
         'gqi_vectors' the scanner wave vectors needed for a GQI acquisitions of 101 directions tested on Siemens 3T Trio
         'small_25' small ROI (10x8x2) DTI data (b value 2000, 25 directions)
+        'test_piesno' slice of N=8, K=14 diffusion data
+        'reg_c' small 2D image used for validating registration
+        'reg_o' small 2D image used for validation registration
+        'cb_2' two vectorized cingulum bundles
 
     Returns
     -------
@@ -234,6 +255,34 @@ def get_data(name='small_64D'):
         fbvecs = pjoin(THIS_DIR, 'small_25.bvec')
         fimg = pjoin(THIS_DIR, 'small_25.nii.gz')
         return fimg, fbvals, fbvecs
+    if name == "S0_10":
+        fimg = pjoin(THIS_DIR, 'S0_10slices.nii.gz')
+        return fimg
+    if name == "test_piesno":
+        fimg = pjoin(THIS_DIR, 'test_piesno.nii.gz')
+        return fimg
+    if name == "reg_c":
+        return pjoin(THIS_DIR, 'C.npy')
+    if name == "reg_o":
+        return pjoin(THIS_DIR, 'circle.npy')
+    if name == 'cb_2':
+        return pjoin(THIS_DIR, 'cb_2.npz')
+
+
+def _gradient_from_file(filename):
+    """Reads a gradient file saved as a text file compatible with np.loadtxt
+    and saved in the dipy data directory"""
+    def gtab_getter():
+        gradfile = pjoin(THIS_DIR, filename)
+        grad = np.loadtxt(gradfile, delimiter=',')
+        gtab = GradientTable(grad)
+        return gtab
+    return gtab_getter
+
+
+get_3shell_gtab = _gradient_from_file("gtab_3shell.txt")
+get_isbi2013_2shell_gtab = _gradient_from_file("gtab_isbi2013_2shell.txt")
+get_gtab_taiwan_dsi = _gradient_from_file("gtab_taiwan_dsi.txt")
 
 
 def dsi_voxels():
@@ -289,3 +338,44 @@ def mrtrix_spherical_functions():
     # gradients[:, 3] are the b-values for each gradient/volume.
     sphere = Sphere(xyz=gradients[1:, :3])
     return func_coef, func_discrete[..., 1:], sphere
+
+
+dipy_cmaps = None
+def get_cmap(name):
+    """Makes a callable, similar to maptlotlib.pyplot.get_cmap"""
+    global dipy_cmaps
+    if dipy_cmaps is None:
+        filename = pjoin(THIS_DIR, "dipy_colormaps.json")
+        with open(filename) as f:
+            dipy_cmaps = json.load(f)
+
+    desc = dipy_cmaps.get(name)
+    if desc is None:
+        return None
+
+    def simple_cmap(v):
+        """Emulates matplotlib colormap callable"""
+        rgba = np.ones((len(v), 4))
+        for i, color in enumerate(('red', 'green', 'blue')):
+            x, y0, y1 = zip(*desc[color])
+            # Matplotlib allows more complex colormaps, but for users who do
+            # not have Matplotlib dipy makes a few simple colormaps available.
+            # These colormaps are simple because y0 == y1, and therefor we
+            # ignore y1 here.
+            rgba[:, i] = np.interp(v, x, y0)
+        return rgba
+
+    return simple_cmap
+
+
+def two_cingulum_bundles():
+    fname = get_data('cb_2')
+    res = np.load(fname)
+    cb1 = relist_streamlines(res['points'], res['offsets'])
+    cb2 = relist_streamlines(res['points2'], res['offsets2'])
+    return cb1, cb2
+
+def matlab_life_results():
+    matlab_rmse = np.load(pjoin(THIS_DIR, 'life_matlab_rmse.npy'))
+    matlab_weights = np.load(pjoin(THIS_DIR, 'life_matlab_weights.npy'))
+    return matlab_rmse, matlab_weights

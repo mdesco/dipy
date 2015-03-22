@@ -26,6 +26,9 @@ class GradientTable(object):
         diffusion gradients
     bvals : (N,) ndarray
         The b-value, or magnitude, of each gradient direction.
+    qvals: (N,) ndarray
+        The q-value for each gradient direction. Needs big and small
+        delta.
     bvecs : (N,3) ndarray
         The direction, represented as a unit vector, of each gradient.
     b0s_mask : (N,) ndarray
@@ -47,6 +50,8 @@ class GradientTable(object):
         if gradients.ndim != 2 or gradients.shape[1] != 3:
             raise ValueError("gradients should be an (N, 3) array")
         self.gradients = gradients
+        # Avoid nan gradients. Set these to 0 instead:
+        self.gradients = np.where(np.isnan(gradients), 0., gradients)
         self.big_delta = big_delta
         self.small_delta = small_delta
         self.b0_threshold = b0_threshold
@@ -54,6 +59,11 @@ class GradientTable(object):
     @auto_attr
     def bvals(self):
         return vector_norm(self.gradients)
+
+    @auto_attr
+    def qvals(self):
+        tau = self.big_delta - self.small_delta / 3.0
+        return np.sqrt(self.bvals / tau) / (2 * np.pi)
 
     @auto_attr
     def b0s_mask(self):
@@ -114,7 +124,7 @@ def gradient_table_from_bvals_bvecs(bvals, bvecs, b0_threshold=0, atol=1e-2,
     dwi_mask = bvals > b0_threshold
 
     # check that bvals is (N,) array and bvecs is (N, 3) unit vectors
-    if bvals.ndim != 1 or bvecs.ndim != 2 or len(bvecs) != len(bvals):
+    if bvals.ndim != 1 or bvecs.ndim != 2 or bvecs.shape[0] != bvals.shape[0]:
         raise ValueError("bvals and bvecs should be (N,) and (N, 3) arrays "
                          "respectively, where N is the number of diffusion "
                          "gradients")
@@ -215,7 +225,7 @@ def gradient_table(bvals, bvecs=None, big_delta=None, small_delta=None,
           _, bvecs = io.read_bvals_bvecs(None, bvecs)
 
     bvals = np.asarray(bvals)
-    # If bvals is None we expect bvals to be an (N, 3) or (3, N) array
+    # If bvecs is None we expect bvals to be an (N, 4) or (4, N) array.
     if bvecs is None:
         if bvals.shape[-1] == 4:
             bvecs = bvals[:, 1:]
@@ -225,12 +235,12 @@ def gradient_table(bvals, bvecs=None, big_delta=None, small_delta=None,
             bvals = np.squeeze(bvals[0, :])
         else:
             raise ValueError("input should be bvals and bvecs OR an (N, 4)"
-                             "array containing both bvals and bvecs")
+                             " array containing both bvals and bvecs")
     else:
         bvecs = np.asarray(bvecs)
-        if bvecs.shape[1] > bvecs.shape[0]:
+        if (bvecs.shape[1] > bvecs.shape[0])  and bvecs.shape[0]>1:
             bvecs = bvecs.T
-    return gradient_table_from_bvals_bvecs(bvals, bvecs, big_delta=None,
-                                           small_delta=None,
+    return gradient_table_from_bvals_bvecs(bvals, bvecs, big_delta=big_delta,
+                                           small_delta=small_delta,
                                            b0_threshold=b0_threshold,
-                                           atol=1e-2)
+                                           atol=atol)
