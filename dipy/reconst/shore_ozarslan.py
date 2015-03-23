@@ -177,7 +177,7 @@ class ShoreOzarslanModel(Cache):
         self.tenmodel = dti.TensorModel(gtab)
 
     @multi_voxel_fit
-    def fit(self, data):
+    def fit(self, data, mask=None):
 
         tenfit = self.tenmodel.fit(data)
         evals = tenfit.evals
@@ -269,6 +269,11 @@ class ShoreOzarslanModel(Cache):
 
         if not(self.constraint_e0):
             coef = coef / sum(coef * self.B_mat)
+        
+        # Apply the mask to the coefficients
+        if mask is not None:
+            mask = np.asarray(mask, dtype=bool)
+            coef *= mask[..., None]
 
         return ShoreOzarslanFit(self, coef, mu, R, lopt, loptN, loptL)
 
