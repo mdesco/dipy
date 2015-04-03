@@ -179,7 +179,7 @@ class ShoreOzarslanModel(Cache):
     @multi_voxel_fit
     def fit(self, data, mask=None):
 
-        tenfit = self.tenmodel.fit(data)
+        tenfit = self.tenmodel.fit(data, mask)
         evals = tenfit.evals
         tensor_linearity = dti.linearity(evals)
         if tensor_linearity > self.tensor_linearity_threshold:
