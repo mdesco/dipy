@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 from dipy.reconst.cache import Cache
 from dipy.core.geometry import cart2sphere
@@ -205,6 +206,7 @@ class ShoreOzarslanModel(Cache):
 
         if self.laplacian_regularization:
             laplacian_matrix = self.laplacian_matrix * mu
+
             if self.laplacian_weighting == 'GCV':
                 lopt = generalized_crossvalidation(data, M,
                                                    laplacian_matrix)
@@ -215,7 +217,22 @@ class ShoreOzarslanModel(Cache):
                 Q = matrix(np.dot(M.T, M) + lopt * laplacian_matrix)
             else:
                 Mreg = np.dot(M.T, M) + lopt * laplacian_matrix
-                coef = np.dot(np.dot(np.linalg.pinv(Mreg), M.T), data)
+                zeros = np.zeros(Mreg.shape[0])
+                coef = zeros
+
+                if (data == 0).all() :
+                    coef = zeros
+                else :
+                    try:
+                        MregInv = np.linalg.pinv(Mreg)
+                        coef = np.dot(np.dot(MregInv, M.T), data)
+                    except np.linalg.linalg.LinAlgError as err: 
+                        if 'SVD did not converge' in err.message:
+                            warnings.warn('SVD did not converge')
+                            coef = zeros
+                        else:
+                            raise
+
         else:
             lopt = 0
 
@@ -232,7 +249,22 @@ class ShoreOzarslanModel(Cache):
                 Q = matrix(np.dot(M.T, M) + loptN * N_mat + loptL * L_mat)
             else:
                 Mreg = np.dot(M.T, M) + loptN * N_mat + loptL * L_mat
-                coef = np.dot(np.dot(np.linalg.pinv(Mreg), M.T), data)
+                zeros = np.zeros(Mreg.shape[0])
+                coef = zeros
+
+                if (data == 0).all() :
+                    coef = zeros
+                else :
+                    try:
+                        MregInv = np.linalg.pinv(Mreg)
+                        coef = np.dot(np.dot(MregInv, M.T), data)
+                    except np.linalg.linalg.LinAlgError as err: 
+                        if 'SVD did not converge' in err.message:
+                            warnings.warn('SVD did not converge')
+                            coef = zeros
+                        else:
+                            raise
+
         else:
             loptN = loptL = 0
 
