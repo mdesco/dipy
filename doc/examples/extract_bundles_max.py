@@ -75,8 +75,8 @@ def ismrm_next_bundle(model_bundles_dir, verbose=False):
     if verbose :
         print 'Model dir:', model_bundles_dir
 
-    if False :
-        wb_trk2 = model_bundles_dir + 'IOFF_left.fib'
+    if True :
+        wb_trk2 = model_bundles_dir + 'Cingulum_right.fib'
         wb2 = read_fib(wb_trk2, None)
         tag = basename(wb_trk2).split('.fib')[0]
         yield (wb2, tag)
@@ -247,12 +247,22 @@ def exp_validation_with_ismrm(model_tracts_dir,
         elif tag == 'Fornix' or tag=='MCP' or tag=='SLF_left' or tag=='SLF_right' or tag=='CC' or tag=='Cingulum_left' or tag=='Cingulum_right':
             new_clean_thr = 10.
             print 'For bundle', tag, 'clean threshold is:', new_clean_thr
-        elif tag == 'ICP_left' or tag == 'ICP_right' :
+        elif tag == 'ICP_left' or tag == 'ICP_right' or tag == 'OR_left' or tag == 'OR_right':
             new_clean_thr = 6.
             print 'For bundle', tag, 'clean threshold is:', new_clean_thr
         else :
             new_clean_thr = clean_thr
             print 'For bundle', tag, 'clean threshold is:', new_clean_thr
+
+
+        if full_brain_streamlines_tag == '4_0' :
+            if tag == 'Cingulum_left' or tag == 'Cingulum_right':
+                new_clean_thr = 5.
+                print 'For bundle', tag, 'clean threshold is:', new_clean_thr
+            else :
+                new_clean_thr = clean_thr
+                print 'For bundle', tag, 'clean threshold is:', new_clean_thr
+        
         
         extracted, mat2 = auto_extract(streamlines, full_streamlines,
                                        number_pts_per_str=number_pts_per_str,
@@ -282,7 +292,7 @@ if __name__ == '__main__':
     exp_validation_with_ismrm(model_tracts_dir,
                               full_tracts_dir,
                               fiber_extension, 
-                              full_brain_streamlines_tag=files[0], 
+                              full_brain_streamlines_tag=files[1], 
                               random_N=100000, # randomly pick N fibers from the full set of streamline. 
                               number_pts_per_str=12, # this is low but works fine
                               close_centroids_thr=20,
@@ -292,8 +302,8 @@ if __name__ == '__main__':
                               expand_thr=None) 
 
 
-
-# perfect overlap for 'merged_final_bundles'
-
+# Observations:
+# - perfect overlap for 'merged_final_bundles'
+# - Cg is a problem for 4_0
 
 
