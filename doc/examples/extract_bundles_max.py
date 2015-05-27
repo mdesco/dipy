@@ -244,10 +244,10 @@ def exp_validation_with_ismrm(model_tracts_dir,
         if tag == 'CP' or tag == 'CA':
             new_clean_thr = 2.
             print 'For bundle', tag, 'clean threshold is:', new_clean_thr
-        if tag == 'Fornix' or tag=='MCP' or tag=='SLF_left' or tag=='SLF_right' or tag=='CC' or tag=='Cingulum_left' or tag=='Cingulum_right':
+        elif tag == 'Fornix' or tag=='MCP' or tag=='SLF_left' or tag=='SLF_right' or tag=='CC' or tag=='Cingulum_left' or tag=='Cingulum_right':
             new_clean_thr = 10.
             print 'For bundle', tag, 'clean threshold is:', new_clean_thr
-        if tag == 'ICP_left' or tag == 'ICP_right' :
+        elif tag == 'ICP_left' or tag == 'ICP_right' :
             new_clean_thr = 6.
             print 'For bundle', tag, 'clean threshold is:', new_clean_thr
         else :
