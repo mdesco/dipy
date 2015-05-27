@@ -240,7 +240,8 @@ def exp_validation_with_ismrm(model_tracts_dir,
             
         if tag == 'CP' or tag == 'CA':
             clean_thr = 2.
-
+            print 'For bundle', tag, 'clean threshold is:', clean_thr
+                        
         
         extracted, mat2 = auto_extract(streamlines, full_streamlines,
                                        number_pts_per_str=number_pts_per_str,
@@ -272,7 +273,7 @@ if __name__ == '__main__':
                               random_N=None, #100000, # randomly pick N fibers from the full set of streamline. 
                               number_pts_per_str=12, # this is low but works fine
                               close_centroids_thr=20,
-                              clean_thr=5., # 2 is too aggressive for most bundles
+                              clean_thr=7., # 2 is too aggressive for most bundles
                               verbose=False,
                               disp=False,
                               expand_thr=None) 
