@@ -75,18 +75,25 @@ def ismrm_next_bundle(model_bundles_dir, verbose=False):
     if verbose :
         print 'Model dir:', model_bundles_dir
 
-    for wb_trk2 in glob(model_bundles_dir + '*.fib'):
-        if verbose:
-            print(wb_trk2)
-        
+    if False :
+        wb_trk2 = model_bundles_dir + 'CP.fib'
         wb2 = read_fib(wb_trk2, None)
-
         tag = basename(wb_trk2).split('.fib')[0]
-        
-        if verbose:
-            print(tag)
-
         yield (wb2, tag)
+
+    else :
+        for wb_trk2 in glob(model_bundles_dir + '*.fib'):
+            if verbose:
+                print(wb_trk2)
+                
+            wb2 = read_fib(wb_trk2, None)
+        
+            tag = basename(wb_trk2).split('.fib')[0]
+        
+            if verbose:
+                print(tag)
+
+            yield (wb2, tag)
 
 
 def ismrm_initial(full_tracts_dir, fulldataset_name, fiber_extension, 
@@ -213,7 +220,7 @@ def exp_validation_with_ismrm(model_tracts_dir,
                               number_pts_per_str=12, 
                               close_centroids_thr=20,
                               clean_thr=5.,
-                              verbose=True,
+                              verbose=False,
                               disp=False,
                               expand_thr=None):
 
@@ -228,11 +235,13 @@ def exp_validation_with_ismrm(model_tracts_dir,
         print 'Full streamlines number:', len(full_streamlines)
         print 'model streamlines number:', len(streamlines)
 
-        print('Duration %f ' % (time() - t, ))
-        
         if disp :
             show_bundles(streamlines, full_streamlines)
             
+        if tag == 'CP' or tag == 'CA':
+            clean_thr = 2.
+
+        
         extracted, mat2 = auto_extract(streamlines, full_streamlines,
                                        number_pts_per_str=number_pts_per_str,
                                        close_centroids_thr=close_centroids_thr,
@@ -240,10 +249,14 @@ def exp_validation_with_ismrm(model_tracts_dir,
                                        disp=disp, verbose=verbose,
                                        expand_thr=expand_thr)
 
-        show_bundles(streamlines, extracted)
+        if len(extracted) > 0 :
+            print len(extracted), ' streamlines found...'
+            show_bundles(streamlines, extracted)
+        else :
+            print 'The dataset does not contain this bundle...'
+
         # here we need to write as we want
         
-    return bas
 
 
 if __name__ == '__main__':
@@ -252,17 +265,21 @@ if __name__ == '__main__':
     full_tracts_dir = '/home/local/USHERBROOKE/desm2239/Research/Data/Challenge/full_datasets/'
     fiber_extension = '.fib'
 
-    bas = exp_validation_with_ismrm(model_tracts_dir,
-                                    full_tracts_dir,
-                                    fiber_extension, 
-                                    full_brain_streamlines_tag='10_10', 
-                                    random_N=100000, # randomly pick N fibers from the full set of streamline. 
-                                    number_pts_per_str=12, 
-                                    close_centroids_thr=20,
-                                    clean_thr=7., # 5 seems good. 7 is more permissive, could be tested.
-                                    verbose=False,
-                                    disp=False,
-                                    expand_thr=None) # 5mm seems too high. But we could try with 2mm.
+    exp_validation_with_ismrm(model_tracts_dir,
+                              full_tracts_dir,
+                              fiber_extension, 
+                              full_brain_streamlines_tag='10_10', 
+                              random_N=None, #100000, # randomly pick N fibers from the full set of streamline. 
+                              number_pts_per_str=12, # this is low but works fine
+                              close_centroids_thr=20,
+                              clean_thr=5., # 2 is too aggressive for most bundles
+                              verbose=False,
+                              disp=False,
+                              expand_thr=None) 
+
+
+
+# perfect overlap for 'merged_final_bundles'
 
 
 
