@@ -75,7 +75,7 @@ def ismrm_next_bundle(model_bundles_dir, verbose=False):
     if verbose :
         print 'Model dir:', model_bundles_dir
 
-    if True :
+    if False :
         wb_trk2 = model_bundles_dir + 'IOFF_left.fib'
         wb2 = read_fib(wb_trk2, None)
         tag = basename(wb_trk2).split('.fib')[0]
@@ -283,7 +283,7 @@ if __name__ == '__main__':
                               full_tracts_dir,
                               fiber_extension, 
                               full_brain_streamlines_tag=files[0], 
-                              random_N=None, #100000, # randomly pick N fibers from the full set of streamline. 
+                              random_N=100000, # randomly pick N fibers from the full set of streamline. 
                               number_pts_per_str=12, # this is low but works fine
                               close_centroids_thr=20,
                               clean_thr=7., # 7 seems like a good compromise. Larger than that we add spurious tracts
