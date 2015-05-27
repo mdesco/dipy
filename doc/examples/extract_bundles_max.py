@@ -239,14 +239,15 @@ def exp_validation_with_ismrm(model_tracts_dir,
             show_bundles(streamlines, full_streamlines)
             
         if tag == 'CP' or tag == 'CA':
-            clean_thr = 2.
+            new_clean_thr = 2.
             print 'For bundle', tag, 'clean threshold is:', clean_thr
-                        
+        else :
+            new_clean_thr = clean_thr
         
         extracted, mat2 = auto_extract(streamlines, full_streamlines,
                                        number_pts_per_str=number_pts_per_str,
                                        close_centroids_thr=close_centroids_thr,
-                                       clean_thr=clean_thr,
+                                       clean_thr=new_clean_thr,
                                        disp=disp, verbose=verbose,
                                        expand_thr=expand_thr)
 
