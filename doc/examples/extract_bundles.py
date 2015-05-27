@@ -20,7 +20,7 @@ from dipy.tracking.distances import (bundles_distances_mdf,
                                      bundles_distances_mam)
 from itertools import chain, izip
 from dipy.align.streamlinear import StreamlineLinearRegistration
-from dipy.viz.axycolor import distinguishable_colormap
+from axycolor import distinguishable_colormap
 from os import mkdir
 from os.path import isdir
 import os
