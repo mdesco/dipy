@@ -276,11 +276,13 @@ if __name__ == '__main__':
     model_tracts_dir = '/home/local/USHERBROOKE/desm2239/Research/Data/Challenge/Final/tracts/'
     full_tracts_dir = '/home/local/USHERBROOKE/desm2239/Research/Data/Challenge/full_datasets/'
     fiber_extension = '.fib'
+    
+    files = ['3_0', '4_0', '10_10', '11_0', '14_0', '20_0'];
 
     exp_validation_with_ismrm(model_tracts_dir,
                               full_tracts_dir,
                               fiber_extension, 
-                              full_brain_streamlines_tag='10_10', 
+                              full_brain_streamlines_tag=files[0], 
                               random_N=None, #100000, # randomly pick N fibers from the full set of streamline. 
                               number_pts_per_str=12, # this is low but works fine
                               close_centroids_thr=20,
