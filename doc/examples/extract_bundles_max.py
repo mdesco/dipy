@@ -75,8 +75,8 @@ def ismrm_next_bundle(model_bundles_dir, verbose=False):
     if verbose :
         print 'Model dir:', model_bundles_dir
 
-    if False :
-        wb_trk2 = model_bundles_dir + 'CP.fib'
+    if True :
+        wb_trk2 = model_bundles_dir + 'IOFF_left.fib'
         wb2 = read_fib(wb_trk2, None)
         tag = basename(wb_trk2).split('.fib')[0]
         yield (wb2, tag)
@@ -237,12 +237,22 @@ def exp_validation_with_ismrm(model_tracts_dir,
 
         if disp :
             show_bundles(streamlines, full_streamlines)
-            
+        
+        # Big bundles with many branches can handle larger clean_thr
+        # CA and CP go through a 1-2 voxels funnel, they need a small clean_thr
+        # Others are stable at 5-7 
         if tag == 'CP' or tag == 'CA':
             new_clean_thr = 2.
-            print 'For bundle', tag, 'clean threshold is:', clean_thr
+            print 'For bundle', tag, 'clean threshold is:', new_clean_thr
+        if tag == 'Fornix' or tag=='MCP' or tag=='SLF_left' or tag=='SLF_right' or tag=='CC' or tag=='Cingulum_left' or tag=='Cingulum_right':
+            new_clean_thr = 10.
+            print 'For bundle', tag, 'clean threshold is:', new_clean_thr
+        if tag == 'ICP_left' or tag == 'ICP_right' :
+            new_clean_thr = 6.
+            print 'For bundle', tag, 'clean threshold is:', new_clean_thr
         else :
             new_clean_thr = clean_thr
+            print 'For bundle', tag, 'clean threshold is:', new_clean_thr
         
         extracted, mat2 = auto_extract(streamlines, full_streamlines,
                                        number_pts_per_str=number_pts_per_str,
@@ -274,7 +284,7 @@ if __name__ == '__main__':
                               random_N=None, #100000, # randomly pick N fibers from the full set of streamline. 
                               number_pts_per_str=12, # this is low but works fine
                               close_centroids_thr=20,
-                              clean_thr=7., # 2 is too aggressive for most bundles
+                              clean_thr=7., # 7 seems like a good compromise. Larger than that we add spurious tracts
                               verbose=False,
                               disp=False,
                               expand_thr=None) 
