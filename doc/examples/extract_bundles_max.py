@@ -293,7 +293,10 @@ if __name__ == '__main__':
     
     files = ['3_0', '4_0', '10_10', '11_0', '14_0', '20_0'];
 
-    for f in files :
+    
+    for f in glob(full_tracts_dir): #files :
+        print 'Submission: ', f
+
         exp_validation_with_ismrm(model_tracts_dir,
                                   full_tracts_dir,
                                   fiber_extension, 
