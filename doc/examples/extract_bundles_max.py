@@ -75,8 +75,10 @@ def ismrm_next_bundle(model_bundles_dir, verbose=False):
     if verbose :
         print 'Model dir:', model_bundles_dir
 
-    if True :
-        wb_trk2 = model_bundles_dir + 'Cingulum_right.fib'
+    if False :
+        #t = ['UF_right.fib', 'SLF_right.fib', 'SCP_right.fib', 'POPT_right.fib', 'OR_right.fib', 'CST_right.fib']
+        # Fornix, CP, MCP, CC, CA
+        wb_trk2 = model_bundles_dir + 'CA.fib' #CC
         wb2 = read_fib(wb_trk2, None)
         tag = basename(wb_trk2).split('.fib')[0]
         yield (wb2, tag)
@@ -232,38 +234,43 @@ def exp_validation_with_ismrm(model_tracts_dir,
         print(tag)
         t = time()
 
-        print 'Full streamlines number:', len(full_streamlines)
-        print 'model streamlines number:', len(streamlines)
+        N_full = len(full_streamlines)
+        N_model = len(streamlines)
+        print 'Full streamlines number:', N_full
+        print 'model streamlines number:', N_model
+        
+        N_max = np.round(N_full/3)
+        print 'Maximum number of streamlines in model is:', N_max
 
+        streamlines = select_random_set_of_streamlines(streamlines, N_max)
+        
         if disp :
             show_bundles(streamlines, full_streamlines)
         
         # Big bundles with many branches can handle larger clean_thr
+        # Except of the cingulum, which grabs the other side if larger than 5
         # CA and CP go through a 1-2 voxels funnel, they need a small clean_thr
         # Others are stable at 5-7 
         if tag == 'CP' or tag == 'CA':
             new_clean_thr = 2.
             print 'For bundle', tag, 'clean threshold is:', new_clean_thr
-        elif tag == 'Fornix' or tag=='MCP' or tag=='SLF_left' or tag=='SLF_right' or tag=='CC' or tag=='Cingulum_left' or tag=='Cingulum_right':
+        elif tag == 'CST_right' or tag == 'CST_left' or tag == 'SCP_right' or tag == 'SCP_left':
+            new_clean_thr = 3.
+            print 'For bundle', tag, 'clean threshold is:', new_clean_thr
+        elif tag=='MCP' or tag=='SLF_left' or tag=='SLF_right' or tag=='CC':
             new_clean_thr = 10.
             print 'For bundle', tag, 'clean threshold is:', new_clean_thr
-        elif tag == 'ICP_left' or tag == 'ICP_right' or tag == 'OR_left' or tag == 'OR_right':
+        elif tag == 'Fornix' or tag=='UF_right' or tag=='UF_left' or tag == 'ICP_left' or tag == 'ICP_right' or tag == 'OR_left' or tag == 'OR_right':
             new_clean_thr = 6.
+            print 'For bundle', tag, 'clean threshold is:', new_clean_thr
+        elif tag == 'Cingulum_left' or tag == 'Cingulum_right':
+            new_clean_thr = 5.
             print 'For bundle', tag, 'clean threshold is:', new_clean_thr
         else :
             new_clean_thr = clean_thr
             print 'For bundle', tag, 'clean threshold is:', new_clean_thr
 
 
-        if full_brain_streamlines_tag == '4_0' :
-            if tag == 'Cingulum_left' or tag == 'Cingulum_right':
-                new_clean_thr = 5.
-                print 'For bundle', tag, 'clean threshold is:', new_clean_thr
-            else :
-                new_clean_thr = clean_thr
-                print 'For bundle', tag, 'clean threshold is:', new_clean_thr
-        
-        
         extracted, mat2 = auto_extract(streamlines, full_streamlines,
                                        number_pts_per_str=number_pts_per_str,
                                        close_centroids_thr=close_centroids_thr,
@@ -277,9 +284,6 @@ def exp_validation_with_ismrm(model_tracts_dir,
         else :
             print 'The dataset does not contain this bundle...'
 
-        # here we need to write as we want
-        
-
 
 if __name__ == '__main__':
 
@@ -289,21 +293,28 @@ if __name__ == '__main__':
     
     files = ['3_0', '4_0', '10_10', '11_0', '14_0', '20_0'];
 
-    exp_validation_with_ismrm(model_tracts_dir,
-                              full_tracts_dir,
-                              fiber_extension, 
-                              full_brain_streamlines_tag=files[1], 
-                              random_N=100000, # randomly pick N fibers from the full set of streamline. 
-                              number_pts_per_str=12, # this is low but works fine
-                              close_centroids_thr=20,
-                              clean_thr=7., # 7 seems like a good compromise. Larger than that we add spurious tracts
-                              verbose=False,
-                              disp=False,
-                              expand_thr=None) 
+    for f in files :
+        exp_validation_with_ismrm(model_tracts_dir,
+                                  full_tracts_dir,
+                                  fiber_extension, 
+                                  full_brain_streamlines_tag=f, 
+                                  random_N=100000, # randomly pick N fibers from the full set of streamline. 
+                                  number_pts_per_str=12, # this is low but works fine
+                                  close_centroids_thr=20,
+                                  clean_thr=7., # 7 seems like a good compromise. 
+                                                # Larger than that we add spurious tracts
+                                  verbose=False,
+                                  disp=False,
+                                  expand_thr=None) 
 
 
 # Observations:
 # - perfect overlap for 'merged_final_bundles'
-# - Cg is a problem for 4_0
-
+# - Cg is a problem - the large part of branching/fanning outweighs the curing branch
+# - SCP, comme CA ou CP doit avoir un seuil petit car proche de l'autre hemis
+# - CST idem. Tricky fucker because of the almost overlap at the bottom of the streamline
+# - 11_0 est plus probabiliste comme resultat... semble avoir plus de spurious
+# - 
+# - 20_0, super bien aligne pour le UF
+# 
 
