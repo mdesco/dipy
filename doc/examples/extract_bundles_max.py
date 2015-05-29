@@ -57,17 +57,24 @@ def show_bundles(static, moving, linewidth=1., tubes=False,
     else:
         static_actor = fvtk.line(static, fvtk.colors.red,
                                  linewidth=linewidth, opacity=opacity)
-        moving_actor = fvtk.line(moving, fvtk.colors.green,
-                                 linewidth=linewidth, opacity=opacity)
+        if moving is not None: 
+            moving_actor = fvtk.line(moving, fvtk.colors.green,
+                                     linewidth=linewidth, opacity=opacity)
 
     fvtk.add(ren, static_actor)
-    fvtk.add(ren, moving_actor)
+
+    if moving is not None: 
+        fvtk.add(ren, moving_actor)
 
     fvtk.add(ren, fvtk.axes(scale=(2, 2, 2)))
 
-    fvtk.show(ren, size=(900, 900))
+
     if fname is not None:
-        fvtk.record(ren, size=(900, 900), out_path=fname)
+        print 'Saving ', fname
+        #fvtk.record(ren, size=(900, 900), out_path=fname)
+        fvtk.snapshot(ren, fname, size=(900, 900))
+    else :
+        fvtk.show(ren, size=(900, 900))
 
 
 def ismrm_next_bundle(model_bundles_dir, verbose=False):
@@ -78,7 +85,7 @@ def ismrm_next_bundle(model_bundles_dir, verbose=False):
     if False :
         #t = ['UF_right.fib', 'SLF_right.fib', 'SCP_right.fib', 'POPT_right.fib', 'OR_right.fib', 'CST_right.fib']
         # Fornix, CP, MCP, CC, CA
-        wb_trk2 = model_bundles_dir + 'CA.fib' #CC
+        wb_trk2 = model_bundles_dir + 'Cingulum_right.fib' #CC
         wb2 = read_fib(wb_trk2, None)
         tag = basename(wb_trk2).split('.fib')[0]
         yield (wb2, tag)
@@ -127,10 +134,13 @@ def auto_extract(model_bundle, moved_streamlines,
     rmodel_bundle = set_number_of_points(model_bundle, number_pts_per_str)
     rmodel_bundle = [s.astype('f4') for s in rmodel_bundle]
 
-    qb = QuickBundles(threshold=20)
+    qb = QuickBundles(threshold=20) # we could play with this for the cingulum bundle
     model_cluster_map = qb.cluster(rmodel_bundle)
     model_centroids = model_cluster_map.centroids
 
+
+    #show_bundles(model_centroids, None)
+    
     if verbose:
         print('Duration %f ' % (time() - t0, ))
 
@@ -224,7 +234,7 @@ def exp_validation_with_ismrm(model_tracts_dir,
                               clean_thr=5.,
                               verbose=False,
                               disp=False,
-                              expand_thr=None):
+                              expand_thr=None, save=False):
 
     print(full_brain_streamlines_tag)    
     full_streamlines = ismrm_initial(full_tracts_dir, full_brain_streamlines_tag, 
@@ -245,7 +255,7 @@ def exp_validation_with_ismrm(model_tracts_dir,
         streamlines = select_random_set_of_streamlines(streamlines, N_max)
         
         if disp :
-            show_bundles(streamlines, full_streamlines)
+            show_bundles(streamlines, full_streamlines, fname=full_brain_streamlines_tag+tag+'.png')
         
         # Big bundles with many branches can handle larger clean_thr
         # Except of the cingulum, which grabs the other side if larger than 5
@@ -264,7 +274,7 @@ def exp_validation_with_ismrm(model_tracts_dir,
             new_clean_thr = 6.
             print 'For bundle', tag, 'clean threshold is:', new_clean_thr
         elif tag == 'Cingulum_left' or tag == 'Cingulum_right':
-            new_clean_thr = 5.
+            new_clean_thr = 6.
             print 'For bundle', tag, 'clean threshold is:', new_clean_thr
         else :
             new_clean_thr = clean_thr
@@ -280,9 +290,12 @@ def exp_validation_with_ismrm(model_tracts_dir,
 
         if len(extracted) > 0 :
             print len(extracted), ' streamlines found...'
-            show_bundles(streamlines, extracted)
+            if not save :
+                continue #show_bundles(streamlines, extracted)
+            else :
+                show_bundles(streamlines, extracted, fname=full_brain_streamlines_tag+tag+'.png')
         else :
-            print 'The dataset does not contain this bundle...'
+            print '\n\t\t!!!The dataset does not contain this bundle...!!!\t\t\n'
 
 
 if __name__ == '__main__':
@@ -294,21 +307,24 @@ if __name__ == '__main__':
     files = ['3_0', '4_0', '10_10', '11_0', '14_0', '20_0'];
 
     
-    for f in glob(full_tracts_dir): #files :
+    for f in glob(full_tracts_dir + '*.fib'): #files :
         print 'Submission: ', f
+        
+        f = basename(f).split('.fib')[0]
 
         exp_validation_with_ismrm(model_tracts_dir,
                                   full_tracts_dir,
                                   fiber_extension, 
                                   full_brain_streamlines_tag=f, 
-                                  random_N=100000, # randomly pick N fibers from the full set of streamline. 
+                                  random_N=None, # randomly pick N fibers from the full set of streamline. 
                                   number_pts_per_str=12, # this is low but works fine
                                   close_centroids_thr=20,
                                   clean_thr=7., # 7 seems like a good compromise. 
                                                 # Larger than that we add spurious tracts
                                   verbose=False,
                                   disp=False,
-                                  expand_thr=None) 
+                                  expand_thr=None,
+                                  save=False) 
 
 
 # Observations:
@@ -320,4 +336,8 @@ if __name__ == '__main__':
 # - 
 # - 20_0, super bien aligne pour le UF
 # 
-
+# Submissions:
+# - 10 almost all bundles found but shift
+# - 20 almost all bundles found and alignment seems very good
+# - 2  " but shift
+# - 3 
