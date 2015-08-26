@@ -87,8 +87,12 @@ def recognize_bundles(model_bundle, moved_streamlines,
 
         slr = StreamlineLinearRegistration(x0=x0, bounds=bounds)
 
+        print(len(model_bundle))
         static = select_random_set_of_streamlines(model_bundle, 400)
+        print(len(static))
+        print(len(close_streamlines))
         moving = select_random_set_of_streamlines(close_streamlines, 600)
+        print(len(moving))
 
         static = set_number_of_points(static, 20)
         # static = [s.astype('f4') for s in static]
