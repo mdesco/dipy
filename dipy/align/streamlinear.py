@@ -639,7 +639,7 @@ def whole_brain_slr(streamlines1, streamlines2,
     clusters2 = remove_clusters_by_size(cluster_map2, rm_small_clusters)
     qb_centroids2 = [cluster.centroid for cluster in clusters2]
 
-    slr = StreamlineLinearRegistration(x0='affine',
+    slr = StreamlineLinearRegistration(x0='rigid',
                                        options={'maxiter': maxiter})
 
     t = time()

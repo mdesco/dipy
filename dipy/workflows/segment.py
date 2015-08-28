@@ -8,18 +8,18 @@ from dipy.tracking.streamline import transform_streamlines
 from nibabel import trackvis as tv
 
 
-def load_trk(fname):
-    streams, hdr = tv.read(fname, points_space='rasmm')
+def load_trk(fname, space='rasmm'):
+    streams, hdr = tv.read(fname, points_space=space)
     return [i[0] for i in streams], hdr
 
 
-def save_trk(fname, streamlines, hdr=None):
+def save_trk(fname, streamlines, hdr=None, space='rasmm'):
     streams = ((s, None, None) for s in streamlines)
     if hdr is not None:
         hdr_dict = {key: hdr[key] for key in hdr.dtype.names}
-        tv.write(fname, streams, hdr_mapping=hdr_dict, points_space='rasmm')
+        tv.write(fname, streams, hdr_mapping=hdr_dict, points_space=space)
     else:
-        tv.write(fname, streams, points_space='rasmm')
+        tv.write(fname, streams, points_space=space)
 
 
 def show_bundles(static, moving, linewidth=1., tubes=False,
@@ -58,6 +58,7 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
                            local_slr=str(1),
                            expand_thr=None,
                            scale_range="0.8:1.2",
+                           space='rasmm',
                            verbose=str(1),
                            disp=str(0)):
 
@@ -77,7 +78,8 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
         pass
 
     print('### Recognition of bundles ###')
-    model_streamlines, hrd_model = load_trk(model_streamlines_file)
+    print 'Loading in %s space' % space
+    model_streamlines, hrd_model = load_trk(model_streamlines_file, space)
 
     print('# Model\'s whole brain streamlines file')
     print(model_streamlines_file)
@@ -85,7 +87,8 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
     print('# Streamline files')
     for sf in sfiles:
         print(sf)
-        streamlines, hdr = load_trk(sf)
+        streamlines, hdr = load_trk(sf, space)
+
         ret = whole_brain_slr(model_streamlines, streamlines,
                               maxiter=150, select_random=50000,
                               verbose=verbose)
@@ -96,23 +99,32 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
         print('# Model_bundle files')
         for mb in mbfiles:
             print(mb)
-            model_bundle, hdr_model_bundle = load_trk(mb)
+            model_bundle, hdr_model_bundle = load_trk(mb, space)
+
+            if disp:
+                #show_bundles(model_bundle, model_streamlines)
+                print('nothing to show')
+                #show_bundles(model_bundle, moved_streamlines)
+                
             extracted_bundle, mat2 = recognize_bundles(
                 model_bundle, moved_streamlines,
                 close_centroids_thr=float(close_centroids_thr),
                 clean_thr=float(clean_thr),
                 local_slr=bool(int(local_slr)),
-                expand_thr=None,
+                expand_thr=expand_thr,
                 scale_range=scale_range,
                 verbose=verbose,
                 return_full=False)
+
+            if len(extracted_bundle) == 0 :
+                continue
 
             extracted_bundle_initial = transform_streamlines(
                 extracted_bundle,
                 np.linalg.inv(np.dot(mat2, mat)))
 
             if disp:
-                show_bundles(model_bundle, extracted_bundle)
+                show_bundles(extracted_bundle, extracted_bundle)
                 # show_bundles(model_streamlines, moved_streamlines)
 
             if out_dir is None:
@@ -126,6 +138,7 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
 
             if not os.path.exists(os.path.dirname(sf_bundle_file)):
                 os.makedirs(os.path.dirname(sf_bundle_file))
-            save_trk(sf_bundle_file, extracted_bundle_initial, hdr=hdr)
+
+            save_trk(sf_bundle_file, extracted_bundle_initial, hdr=hdr, space=space)
 
             print('Recognized bundle saved in %s ' % (sf_bundle_file,))

@@ -71,7 +71,7 @@ def recognize_bundles(model_bundle, moved_streamlines,
 
     out = []
     if return_full:
-        # show_bundles(model_bundle, close_streamlines)
+        #show_bundles(model_bundle, close_streamlines)
         out.append(close_streamlines)
 
     if local_slr:
@@ -87,12 +87,18 @@ def recognize_bundles(model_bundle, moved_streamlines,
 
         slr = StreamlineLinearRegistration(x0=x0, bounds=bounds)
 
-        print(len(model_bundle))
         static = select_random_set_of_streamlines(model_bundle, 400)
-        print(len(static))
-        print(len(close_streamlines))
+
+        if verbose :
+            print 'Number of close streamlines: %d' % len(close_streamlines)
+
+        if len(close_streamlines) == 0 :
+            print '        -> You have no close streamlines... No bundle recognition :(' 
+            if return_full :
+                return close_streamlines, None, None
+            return close_streamlines, None
+        
         moving = select_random_set_of_streamlines(close_streamlines, 600)
-        print(len(moving))
 
         static = set_number_of_points(static, 20)
         # static = [s.astype('f4') for s in static]
@@ -103,43 +109,61 @@ def recognize_bundles(model_bundle, moved_streamlines,
 
         closer_streamlines = transform_streamlines(close_streamlines,
                                                    slm.matrix)
-
         if verbose:
             print('Duration %f ' % (time() - t, ))
 
         if return_full:
             out.append(closer_streamlines)
-            # show_bundles(model_bundle, closer_streamlines)
+            #show_bundles(model_bundle, closer_streamlines)
 
         matrix = slm.matrix
     else:
         closer_streamlines = close_streamlines
         matrix = np.eye(4)
 
-    if verbose:
-        print('# Remove streamlines which are a bit far')
 
-    t = time()
+    if verbose :
+        print 'Number of closer streamlines: %d' % len(closer_streamlines)
 
-    rcloser_streamlines = set_number_of_points(closer_streamlines, 20)
+    if clean_thr != 0 :
+        if verbose:
+            print('# Remove streamlines which are a bit far')
 
-    clean_matrix = bundles_distances_mdf(rmodel_bundle, rcloser_streamlines)
+        t = time()
 
-    clean_matrix[clean_matrix > clean_thr] = np.inf
+        rcloser_streamlines = set_number_of_points(closer_streamlines, 20)
 
-    mins = np.min(clean_matrix, axis=0)
-    close_clusters_clean = [closer_streamlines[i]
-                            for i in np.where(mins != np.inf)[0]]
+        clean_matrix = bundles_distances_mdf(rmodel_bundle, rcloser_streamlines)
+
+        clean_matrix[clean_matrix > clean_thr] = np.inf
+
+        mins = np.min(clean_matrix, axis=0)
+        close_clusters_clean = [closer_streamlines[i]
+                                for i in np.where(mins != np.inf)[0]]
+
+        
+        if verbose :
+            print 'Number of streamlines after cleanup: %d' % len(close_clusters_clean)
+
+        if len(close_clusters_clean) == 0 :
+            print '        -> You have cleaned all your streamlines! No bundle recognition :(' 
+            if return_full :
+                return close_streamlines, None, None
+            return close_streamlines, None
+    else :
+        if verbose :
+            print('No cleaning up...')
+
+        close_clusters_clean = closer_streamlines
 
     if verbose:
         print('Duration %f ' % (time() - t, ))
 
     if return_full:
         out.append(close_clusters_clean)
-        # show_bundles(model_bundle, close_clusters_clean)
+        #show_bundles(model_bundle, close_clusters_clean)
 
     if expand_thr is not None:
-
         if verbose:
             print('# Start expansion strategy')
 
@@ -154,6 +178,9 @@ def recognize_bundles(model_bundle, moved_streamlines,
         expanded = [closer_streamlines[i]
                     for i in np.where(mins != np.inf)[0]]
 
+        if verbose :
+            print 'Number of streamlines after expansion: %d' % len(expanded)
+
         print('Duration %f ' % (time() - t, ))
 
         if return_full:
@@ -165,4 +192,6 @@ def recognize_bundles(model_bundle, moved_streamlines,
 
     if return_full:
         return close_clusters_clean, matrix, out
+
     return close_clusters_clean, matrix
+
