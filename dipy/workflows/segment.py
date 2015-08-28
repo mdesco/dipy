@@ -4,7 +4,8 @@ from dipy.utils.six import string_types
 from glob import glob
 from dipy.align.streamlinear import whole_brain_slr
 from dipy.segment.bundles import recognize_bundles
-from dipy.tracking.streamline import transform_streamlines
+from dipy.tracking.streamline import (transform_streamlines,
+                                      select_random_set_of_streamlines)
 from nibabel import trackvis as tv
 
 
@@ -100,6 +101,10 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
         for mb in mbfiles:
             print(mb)
             model_bundle, hdr_model_bundle = load_trk(mb, space)
+            
+            if len(model_bundle) > 20000 :
+                print('     WARNIING -> too many streamlines in model, subsampling to 20000...')
+                model_bundle = select_random_set_of_streamlines(model_bundle, 20000)
 
             if disp:
                 #show_bundles(model_bundle, model_streamlines)

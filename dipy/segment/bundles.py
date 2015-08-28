@@ -64,8 +64,12 @@ def recognize_bundles(model_bundle, moved_streamlines,
 
     # close_centroids = [cluster.centroid for cluster in close_clusters]
 
-    close_streamlines = list(chain(*close_clusters))
+    close_streamlines = list(chain(*close_clusters))    
 
+    if len(close_streamlines) > 20000 :
+        print('     WARNIING -> too many of close streamlines to process... subsampling to 20000')
+        close_streamlines = select_random_set_of_streamlines(close_streamlines, 20000)
+    
     if verbose:
         print('Duration %f secs.' % (time() - t, ))
 
