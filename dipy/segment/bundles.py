@@ -69,7 +69,7 @@ def recognize_bundles(model_bundle, moved_streamlines,
     if len(close_streamlines) > 20000 :
         print('     WARNIING -> too many of close streamlines to process... subsampling to 20000')
         close_streamlines = select_random_set_of_streamlines(close_streamlines, 20000)
-    
+        
     if verbose:
         print('Duration %f secs.' % (time() - t, ))
 
@@ -152,8 +152,8 @@ def recognize_bundles(model_bundle, moved_streamlines,
         if len(close_clusters_clean) == 0 :
             print '        -> You have cleaned all your streamlines! No bundle recognition :(' 
             if return_full :
-                return close_streamlines, None, None
-            return close_streamlines, None
+                return close_clusters_clean, None, None
+            return close_clusters_clean, None
     else :
         if verbose :
             print('No cleaning up...')

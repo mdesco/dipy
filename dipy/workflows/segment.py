@@ -107,9 +107,9 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
                 model_bundle = select_random_set_of_streamlines(model_bundle, 20000)
 
             if disp:
-                #show_bundles(model_bundle, model_streamlines)
-                print('nothing to show')
-                #show_bundles(model_bundle, moved_streamlines)
+                show_bundles(model_bundle, model_streamlines)
+                #print('nothing to show')
+                show_bundles(model_bundle, moved_streamlines)
                 
             extracted_bundle, mat2 = recognize_bundles(
                 model_bundle, moved_streamlines,
