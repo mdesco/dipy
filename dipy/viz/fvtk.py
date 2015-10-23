@@ -188,6 +188,7 @@ def point(points, colors, opacity=1, point_radius=0.1, theta=8, phi=8):
         glyph.SetInputData(polyData)
     glyph.SetColorModeToColorByScalar()
     glyph.SetScaleModeToDataScalingOff()
+    glyph.Update()
 
     mapper = vtk.vtkPolyDataMapper()
     if major_version <= 5:
