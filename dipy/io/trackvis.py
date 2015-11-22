@@ -5,11 +5,11 @@ from dipy.tracking import utils
 
 
 def load_trk(fname):
-    import nibabel.trackvis as tv
-    streams, hdr = tv.read(fname, points_space='rasmm')
-    return [i[0] for i in streams], hdr
-    # trkfile = nib.streamlines.load(fname)
-    # return trkfile.streamlines, trkfile.header
+    # import nibabel.trackvis as tv
+    # streams, hdr = tv.read(fname, points_space='rasmm')
+    # return [i[0] for i in streams], hdr
+    trkfile = nib.streamlines.load(fname)
+    return trkfile.streamlines, trkfile.header
 
 
 def save_trk(fname, streamlines, hdr=None):

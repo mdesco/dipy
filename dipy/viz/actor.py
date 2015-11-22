@@ -116,7 +116,7 @@ def slicer(data, affine=None, value_range=None, opacity=1.,
     # Set the reslicing
     image_resliced = vtk.vtkImageReslice()
     set_input(image_resliced, im)
-    image_resliced.SetResliceTransform(transform)
+    #image_resliced.SetResliceTransform(transform)
     image_resliced.AutoCropOutputOn()
     image_resliced.SetInterpolationModeToLinear()
     image_resliced.Update()
@@ -203,6 +203,16 @@ def slicer(data, affine=None, value_range=None, opacity=1.,
     image_actor.opacity(opacity)
     if major_version >= 6:
         image_actor.GetMapper().BorderOn()
+
+    transform2 = vtk.vtkTransform()
+    transform_matrix2 = vtk.vtkMatrix4x4()
+    transform_matrix2.DeepCopy((
+        affine[0][0], affine[0][1], affine[0][2], affine[0][3],
+        affine[1][0], affine[1][1], affine[1][2], affine[1][3],
+        affine[2][0], affine[2][1], affine[2][2], affine[2][3],
+        affine[3][0], affine[3][1], affine[3][2], affine[3][3]))
+    transform2.SetMatrix(transform_matrix2)
+    image_actor.SetUserTransform(transform2)
 
     return image_actor
 

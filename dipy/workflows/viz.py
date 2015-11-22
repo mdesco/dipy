@@ -93,8 +93,8 @@ def horizon(tractograms, data, affine, cluster=False, cluster_thr=15.,
         slider = widget.slider(show_m.iren, show_m.ren,
                                callback=change_slice,
                                min_value=0,
-                               max_value=image_actor.shape[1] - 1,
-                               value=image_actor.shape[1] / 2,
+                               max_value=image_actor.shape[2] - 1,
+                               value=image_actor.shape[2] / 2,
                                label="Move slice",
                                right_normalized_pos=(.98, 0.6),
                                size=(120, 0), label_format="%0.lf",
@@ -193,14 +193,13 @@ def horizon_flow(input_files, cluster=False, cluster_thr=15.,
             print('Loading file ...')
             print(f)
             print('\n')
-        sp = path.splitext(f)[1]
 
-        if sp == '.trk':
+        if f.endswith('.trk'):
 
             streamlines, hdr = load_trk(f)
             tractograms.append(streamlines)
 
-        if sp == '.nii.gz' or sp == '.nii':
+        if f.endswith('.nii.gz') or f.endswith('.nii'):
 
             img = nib.load(f)
             data = img.get_data()
