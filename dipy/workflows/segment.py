@@ -266,7 +266,7 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
 
             recognized_tractogram = nib.streamlines.Tractogram(
                 recognized_bundle)
-            recognized_trkfile = nib.streamlines.TrkFile(recognized_tractogram)
+            recognized_trkfile = nib.streamlines.TrkFile(recognized_tractogram, header=model_trkfile.header)
             nib.streamlines.save(recognized_trkfile, sf_bundle_file)
 
             np.save(sf_bundle_labels, np.array(rb.labels))
@@ -284,7 +284,7 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
 
                 neighb_tractogram = nib.streamlines.Tractogram(
                     rb.neighb_streamlines)
-                neighb_trkfile = nib.streamlines.TrkFile(neighb_tractogram)
+                neighb_trkfile = nib.streamlines.TrkFile(neighb_tractogram,  header=model_trkfile.header)
                 nib.streamlines.save(neighb_trkfile, sf_bundle_neighb)
 
                 print('Recognized bundle\'s neighbors saved in \n {} '
@@ -297,7 +297,7 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
 
             centroid_tractogram = nib.streamlines.Tractogram(
                 rb.centroids)
-            centroid_trkfile = nib.streamlines.TrkFile(centroid_tractogram)
+            centroid_trkfile = nib.streamlines.TrkFile(centroid_tractogram, header=model_trkfile.header)
             nib.streamlines.save(centroid_trkfile, sf_centroids)
 
             print('Centroids of streamlines saved in \n {} '
