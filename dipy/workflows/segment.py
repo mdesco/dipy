@@ -275,7 +275,7 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
             recognized_tractogram = nib.streamlines.Tractogram(
                 recognized_bundle)
             recognized_trkfile = nib.streamlines.TrkFile(recognized_tractogram, header=model_trkfile.header)
-            nib.streamlines.save(recognized_trkfile, sf_bundle_file)
+            nib.streamlines.save(recognized_trkfile, sf_bundle_file, header=model_trkfile.header)
 
             np.save(sf_bundle_labels, np.array(rb.labels))
 
@@ -293,7 +293,7 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
                 neighb_tractogram = nib.streamlines.Tractogram(
                     rb.neighb_streamlines)
                 neighb_trkfile = nib.streamlines.TrkFile(neighb_tractogram,  header=model_trkfile.header)
-                nib.streamlines.save(neighb_trkfile, sf_bundle_neighb)
+                nib.streamlines.save(neighb_trkfile, sf_bundle_neighb, header=model_trkfile.header)
 
                 print('Recognized bundle\'s neighbors saved in \n {} '
                       .format(sf_bundle_neighb))
@@ -306,7 +306,7 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
             centroid_tractogram = nib.streamlines.Tractogram(
                 rb.centroids)
             centroid_trkfile = nib.streamlines.TrkFile(centroid_tractogram, header=model_trkfile.header)
-            nib.streamlines.save(centroid_trkfile, sf_centroids)
+            nib.streamlines.save(centroid_trkfile, sf_centroids, header=model_trkfile.header)
 
             print('Centroids of streamlines saved in \n {} '
                   .format(sf_centroids))
@@ -328,7 +328,7 @@ def assign_bundle_labels_flow(streamline_file, labels_files, verbose=True):
     if isinstance(labels_files, string_types):
         lfiles = glob(labels_files)
 
-    from ipdb import set_trace
+    #from ipdb import set_trace
     # set_trace()
     streamlines_trk = nib.streamlines.load(streamline_file)
     streamlines = streamlines_trk.streamlines
@@ -337,7 +337,7 @@ def assign_bundle_labels_flow(streamline_file, labels_files, verbose=True):
 
         labels = np.load(lf)
         recognized_bundle = streamlines[labels.tolist()]
-        set_trace()
+#        set_trace()
         recognized_tractogram = nib.streamlines.Tractogram(recognized_bundle)
         recognized_trkfile = nib.streamlines.TrkFile(
             recognized_tractogram,
@@ -346,7 +346,7 @@ def assign_bundle_labels_flow(streamline_file, labels_files, verbose=True):
         fname = os.path.join(
             os.path.dirname(lf),
             base + '_of_' + os.path.basename(streamline_file))
-        nib.streamlines.save(recognized_trkfile, fname)
+        nib.streamlines.save(recognized_trkfile, fname, header=streamlines_trk.header)
         if verbose:
             print('Bundle saved in \n {} '.format(fname))
 
