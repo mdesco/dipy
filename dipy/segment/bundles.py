@@ -148,6 +148,7 @@ class RecoBundles(object):
 
     def recognize(self, model_bundle, model_clust_thr,
                   reduction_thr=20,
+                  reduction_distance='mdf',
                   slr=True,
                   slr_metric=None,
                   slr_x0=None,
@@ -156,7 +157,8 @@ class RecoBundles(object):
                   slr_method='L-BFGS-B',
                   slr_use_centroids=False,
                   slr_progressive=False,
-                  pruning_thr=10):
+                  pruning_thr=10,
+                  pruning_distance='mdf'):
 
         self.reduction_thr = reduction_thr
         t = time()
@@ -165,7 +167,15 @@ class RecoBundles(object):
 
         self.model_bundle = model_bundle
         self.cluster_model_bundle(model_clust_thr=model_clust_thr)
-        self.reduce_search_space(reduction_thr=reduction_thr)
+        success = self.reduce_search_space(
+            reduction_thr=reduction_thr,
+            reduction_distance=reduction_distance)
+        if not success:
+            self.pruned_streamlines = None
+            self.transf_streamlines = None
+            self.transf_matrix = None
+            self.labels = []
+            return []
         if slr:
             self.register_neighb_to_model(metric=slr_metric,
                                           x0=slr_x0,
@@ -178,7 +188,8 @@ class RecoBundles(object):
         else:
             self.transf_streamlines = self.neighb_streamlines
             self.transf_matrix = np.eye(4)
-        self.prune_what_not_in_model(pruning_thr=pruning_thr)
+        self.prune_what_not_in_model(pruning_thr=pruning_thr,
+                                     pruning_distance=pruning_distance)
 
         if self.verbose:
             print('Total duration of recognition time is %0.3f sec.\n'
@@ -212,14 +223,23 @@ class RecoBundles(object):
                   % (self.nb_model_centroids,))
             print(' Duration %0.3f sec. \n' % (time() - t, ))
 
-    def reduce_search_space(self, reduction_thr=20):
+    def reduce_search_space(self, reduction_thr=20, reduction_distance='mdf'):
         t = time()
         if self.verbose:
             print('# Reduce search space')
             print(' Reduction threshold %0.3f' % (reduction_thr,))
+            print(' Reduction distance {}'.format(reduction_distance))
 
-        centroid_matrix = bundles_distances_mdf(self.model_centroids,
-                                                self.centroids)
+        if reduction_distance.lower() == 'mdf':
+            print(' Using MDF')
+            centroid_matrix = bundles_distances_mdf(self.model_centroids,
+                                                    self.centroids)
+        elif reduction_distance.lower() == 'mam':
+            print(' Using MAM')
+            centroid_matrix = bundles_distances_mdf(self.model_centroids,
+                                                    self.centroids)
+        else:
+            raise ValueError('Given reduction distance not known')
 
         centroid_matrix[centroid_matrix > reduction_thr] = np.inf
 
@@ -252,11 +272,14 @@ class RecoBundles(object):
 
         if self.nb_neighb_streamlines == 0:
             print(' You have no neighbor streamlines... No bundle recognition')
+            return False
 
         if self.verbose:
             print(' Number of neighbor streamlines %d' %
                   (self.nb_neighb_streamlines,))
             print(' Duration %0.3f sec. \n' % (time() - t,))
+
+        return True
 
     def register_neighb_to_model(self, metric=None, x0=None, bounds=None,
                                  select_model=400, select_target=600,
@@ -401,7 +424,8 @@ class RecoBundles(object):
 
             print(' Duration %0.3f sec. \n' % (time() - t,))
 
-    def prune_what_not_in_model(self, mdf_thr=5, pruning_thr=10):
+    def prune_what_not_in_model(self, mdf_thr=5, pruning_thr=10,
+                                pruning_distance='mdf'):
 
         if pruning_thr < 0:
             print('Pruning_thr has to be greater or equal to 0')
@@ -409,6 +433,7 @@ class RecoBundles(object):
         if self.verbose:
             print('# Prune streamlines using the MDF distance')
             print(' Pruning threshold %0.3f' % (pruning_thr,))
+            print(' Pruning distance {}'.format(pruning_distance))
 
         t = time()
 
@@ -427,9 +452,16 @@ class RecoBundles(object):
         self.rtransf_centroids = rtransf_cluster_map.centroids
         self.nb_rtransf_centroids = len(self.rtransf_centroids)
 
-        dist_matrix = bundles_distances_mdf(self.model_centroids,
-                                            self.rtransf_centroids)
-
+        if pruning_distance.lower() == 'mdf':
+            print(' Using MDF')
+            dist_matrix = bundles_distances_mdf(self.model_centroids,
+                                                self.rtransf_centroids)
+        elif pruning_distance.lower() == 'mam':
+            print(' Using MAM')
+            dist_matrix = bundles_distances_mam(self.model_centroids,
+                                                self.rtransf_centroids)
+        else:
+            raise ValueError('Given pruning distance is not available')
         dist_matrix[np.isnan(dist_matrix)] = np.inf
         dist_matrix[dist_matrix > pruning_thr] = np.inf
 

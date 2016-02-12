@@ -30,8 +30,16 @@ def horizon(tractograms, data, affine, cluster=False, cluster_thr=15.,
     ren = window.Renderer()
     global centroid_actors
     centroid_actors = []
+
+    # np.random.seed(42)
+    prng = np.random.RandomState(1838)
+
     for streamlines in tractograms:
 
+        if random_colors:
+            colors = prng.random_sample(3)
+        else:
+            colors = None
         print(' Number of streamlines loaded {} \n'.format(len(streamlines)))
 
         if cluster:
@@ -54,19 +62,15 @@ def horizon(tractograms, data, affine, cluster=False, cluster_thr=15.,
                 # set_trace()
                 if check_range(c, length_lt, length_gt):
                     if sizes[i] > clusters_lt and sizes[i] < clusters_gt:
-                        act = actor.streamtube([c], linewidth=linewidths[i],
+                        act = actor.streamtube([c], colors,
+                                               linewidth=linewidths[i],
                                                lod=False)
                         centroid_actors.append(act)
                         ren.add(act)
                         visible_cluster_id.append(i)
         else:
-            if not random_colors:
-                ren.add(actor.line(streamlines,
-                                   opacity=1., lod_points=10 ** 5))
-            else:
-                colors = np.random.rand(3)
-                ren.add(actor.line(streamlines, colors,
-                                   opacity=1., lod_points=10 ** 5))
+            ren.add(actor.line(streamlines, colors,
+                               opacity=1., lod_points=10 ** 5))
 
     class SimpleTrackBallNoBB(window.vtk.vtkInteractorStyleTrackballCamera):
         def HighlightProp(self, p):
@@ -80,15 +84,20 @@ def horizon(tractograms, data, affine, cluster=False, cluster_thr=15.,
     show_m.initialize()
 
     if data is not None:
+        #from dipy.core.geometry import rodrigues_axis_rotation
+        #affine[:3, :3] = np.dot(affine[:3, :3], rodrigues_axis_rotation((0, 0, 1), 45))
+
         image_actor = actor.slicer(data, affine)
         image_actor.opacity(slicer_opacity)
+        image_actor.SetInterpolate(False)
         ren.add(image_actor)
 
         ren.add(fvtk.axes((10, 10, 10)))
 
         def change_slice(obj, event):
             z = int(np.round(obj.get_value()))
-            image_actor.display(None, None, z)
+            #image_actor.display(None, None, z)
+            image_actor.display(None, z, None)
 
         slider = widget.slider(show_m.iren, show_m.ren,
                                callback=change_slice,
@@ -103,6 +112,7 @@ def horizon(tractograms, data, affine, cluster=False, cluster_thr=15.,
 
     global size
     size = ren.GetSize()
+    ren.background((1, 0.5, 0))
     global picked_actors
     picked_actors = {}
 

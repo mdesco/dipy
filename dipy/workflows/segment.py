@@ -85,8 +85,10 @@ from dipy.io.pickles import save_pickle, load_pickle
 
 def recognize_bundles_flow(streamline_files, model_bundle_files,
                            out_dir=None, clust_thr=15.,
-                           reduction_thr=10., model_clust_thr=5.,
-                           pruning_thr=5., slr=True, slr_metric=None,
+                           reduction_thr=10., reduction_distance='mdf',
+                           model_clust_thr=5.,
+                           pruning_thr=5., pruning_distance='mdf',
+                           slr=True, slr_metric=None,
                            slr_transform='similarity', slr_progressive=True,
                            slr_matrix='small', verbose=True, debug=False):
     """ Recognize bundles
@@ -102,11 +104,15 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
     clust_thr : float, optional
         MDF distance threshold for all streamlines
     reduction_thr : float, optional
-        Reduce search space by (mm). (default 20)
+        Reduce search space by (mm) (default 20)
+    reduction_distance : string, optional
+        Reduction distance type can be mdf or mam (default mdf)
     model_clust_thr : float, optional
         MDF distance threshold for the model bundles (default 5)
     pruning_thr : float, optional
         Pruning after matching (default 5).
+    pruning_distance : string, optional
+        Pruning distance type can be mdf or mam (default mdf)
     slr : bool, optional
         Enable local Streamline-based Linear Registration (default True).
     slr_metric : string, optional
@@ -169,7 +175,7 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
 
     print('### RecoBundles ###')
 
-    # Streamline file
+    # Streamline files where the recognition will take place
     for sf in sfiles:
         print('# Streamline file')
         print(sf)
@@ -224,6 +230,7 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
                 model_bundle,
                 model_clust_thr=float(model_clust_thr),
                 reduction_thr=float(reduction_thr),
+                reduction_distance=reduction_distance,
                 slr=slr,
                 slr_metric=slr_metric,
                 slr_x0=slr_transform,
@@ -232,7 +239,8 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
                 slr_method='L-BFGS-B',
                 slr_use_centroids=False,
                 slr_progressive=slr_progressive,
-                pruning_thr=float(pruning_thr))
+                pruning_thr=float(pruning_thr),
+                pruning_distance=pruning_distance)
 
 # TODO add option to return recognized bundle in the space that you want
 # Or better return the labels of the bundle which I currently do.
@@ -266,8 +274,8 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
 
             recognized_tractogram = nib.streamlines.Tractogram(
                 recognized_bundle)
-            recognized_trkfile = nib.streamlines.TrkFile(recognized_tractogram)
-            nib.streamlines.save(recognized_trkfile, sf_bundle_file)
+            recognized_trkfile = nib.streamlines.TrkFile(recognized_tractogram, header=model_trkfile.header)
+            nib.streamlines.save(recognized_trkfile, sf_bundle_file, header=model_trkfile.header)
 
             np.save(sf_bundle_labels, np.array(rb.labels))
 
@@ -284,8 +292,8 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
 
                 neighb_tractogram = nib.streamlines.Tractogram(
                     rb.neighb_streamlines)
-                neighb_trkfile = nib.streamlines.TrkFile(neighb_tractogram)
-                nib.streamlines.save(neighb_trkfile, sf_bundle_neighb)
+                neighb_trkfile = nib.streamlines.TrkFile(neighb_tractogram,  header=model_trkfile.header)
+                nib.streamlines.save(neighb_trkfile, sf_bundle_neighb, header=model_trkfile.header)
 
                 print('Recognized bundle\'s neighbors saved in \n {} '
                       .format(sf_bundle_neighb))
@@ -297,11 +305,50 @@ def recognize_bundles_flow(streamline_files, model_bundle_files,
 
             centroid_tractogram = nib.streamlines.Tractogram(
                 rb.centroids)
-            centroid_trkfile = nib.streamlines.TrkFile(centroid_tractogram)
-            nib.streamlines.save(centroid_trkfile, sf_centroids)
+            centroid_trkfile = nib.streamlines.TrkFile(centroid_tractogram, header=model_trkfile.header)
+            nib.streamlines.save(centroid_trkfile, sf_centroids, header=model_trkfile.header)
 
             print('Centroids of streamlines saved in \n {} '
                   .format(sf_centroids))
+
+
+def assign_bundle_labels_flow(streamline_file, labels_files, verbose=True):
+    """ Show recognized bundles in their original space
+
+    Parameters
+    ----------
+    streamline_file : string
+    labels_files : string
+    verbose : bool, optional
+        Print standard output (default True)
+    """
+    print(streamline_file)
+    print(labels_files)
+
+    if isinstance(labels_files, string_types):
+        lfiles = glob(labels_files)
+
+    #from ipdb import set_trace
+    # set_trace()
+    streamlines_trk = nib.streamlines.load(streamline_file)
+    streamlines = streamlines_trk.streamlines
+
+    for lf in lfiles:
+
+        labels = np.load(lf)
+        recognized_bundle = streamlines[labels.tolist()]
+#        set_trace()
+        recognized_tractogram = nib.streamlines.Tractogram(recognized_bundle)
+        recognized_trkfile = nib.streamlines.TrkFile(
+            recognized_tractogram,
+            header=streamlines_trk.header)
+        base = os.path.splitext(os.path.basename(lf))[0].split('_labels')[0]
+        fname = os.path.join(
+            os.path.dirname(lf),
+            base + '_of_' + os.path.basename(streamline_file))
+        nib.streamlines.save(recognized_trkfile, fname, header=streamlines_trk.header)
+        if verbose:
+            print('Bundle saved in \n {} '.format(fname))
 
 
 def kdtrees_bundles_flow(streamline_file, labels_file,
