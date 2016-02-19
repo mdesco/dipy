@@ -4,6 +4,7 @@ import os
 import sys
 import itertools
 from os.path import join as pjoin
+from ast import literal_eval
 
 import numpy as np
 import nibabel as nib
@@ -24,9 +25,16 @@ def build_args_parser():
 
     p.add_argument("tractogram", help="File containing streamlines (.trk).")
 
-    p.add_argument("--threshold", type=float, default=0,
-                   help="Reject streamlines having an outlierness score above this threshold (%%)."
-                        "Default: set manually through an interactive display.")
+#     p.add_argument("--threshold", type=float, default=0,
+#                    help="Reject streamlines having an outlierness score above this threshold (%%)."
+#                         "Default: set manually through an interactive display.")
+
+
+    p.add_argument('--thresholds', action='store', dest='thresholds',
+                   metavar='list', default=None, type=str,
+                   help='Reject streamlines having an outlierness score ' +
+		   'above this threshold, e.g. 0.6,0.7,0.8.')
+
 
     p.add_argument("--out", default="./",
                    help="Output dir where to save all the files. Default: './'")
@@ -282,43 +290,51 @@ def main():
     parser = build_args_parser()
     args = parser.parse_args()
 
-    streamlines, colors, properties, hdr = load_tractogram(args.tractogram)
+    streamlines, colors, properties, hdr = load_tractogram(args.tractogram)    
+    thresholds=np.array(literal_eval(args.thresholds), dtype=np.float64) 
+    
+    thresh = np.atleast_1d(thresholds)
+#    print(thresholds, len(thresh), thresh[0])
+#    print np.arange(len(thresh))
 
-    inliers, outliers, outlierness = outlier_rejection(streamlines, threshold=args.threshold,
-                                                       confidence=args.confidence_level, 
-						       seed=args.seed,
-                                                       return_outlierness=True, 
-						       verbose=args.verbose)
+    for i in np.arange(len(thresh)) :
+    	print 'Applying threshold', thresh[i]
+        inliers, outliers, outlierness = outlier_rejection(streamlines, threshold=thresh[i],
+    	                                                   confidence=args.confidence_level, 
+						       	   seed=args.seed,
+                                                       	   return_outlierness=True, 
+						       	   verbose=args.verbose)
 
-    # Create output folder, if needed.
-    try:
-        os.mkdir(args.out)
-    except OSError:
-        pass
+        # Create output folder, if needed.
+        try:
+            os.mkdir(args.out)
+        except OSError:
+            pass
 
-    if args.threshold == 0.:
-        inliers, outliers = interactive_outlier_rejection(streamlines, outlierness, args.tractogram, args.out, hdr)
-        return
+        if args.thresholds == None:
+            inliers, outliers = interactive_outlier_rejection(streamlines, outlierness, args.tractogram, args.out, hdr)
+            return
 
-    # Save results
-    if args.outlierness is not None:
-        np.savetxt(pjoin(args.out, args.outlierness.split(".csv")[0] + ".csv"), outlierness, delimiter=",")
+        # Save results
+        if args.outlierness is not None:
+            np.savetxt(pjoin(args.out, 
+                             args.outlierness.split(".csv")[0] + "_" + str(thresh[i]) + ".csv"), outlierness, delimiter=",")
 
-    if args.histogram is not None:
-        fig = create_hist(outlierness, colormap_name="jet")
-        fig.savefig(pjoin(args.out, args.histogram.split(".png")[0] + ".png"), dpi=300, transparent=False, bbox_inches='tight', pad_inches=0.)
+        if args.histogram is not None:
+            fig = create_hist(outlierness, colormap_name="jet")
+            fig.savefig(pjoin(args.out, args.histogram.split(".png")[0] + "_" + str(thresh[i]) + ".png"), dpi=300, transparent=False, bbox_inches='tight', pad_inches=0.)
 
-    inliers_filename = args.inliers
-    if args.inliers is None:
-        inliers_filename = append_text_to_filename(args.tractogram, "_inliers")
+        inliers_filename = args.inliers.split(".trk")[0] + "_" + str(thresh[i]) + ".trk"
+        if args.inliers is None:
+            inliers_filename = append_text_to_filename(args.tractogram, "_inliers"+"_" + str(thresh[i]))
 
-    save_tractogram(pjoin(args.out, inliers_filename), inliers, [], [], hdr)
+        save_tractogram(pjoin(args.out, inliers_filename), inliers, [], [], hdr)
+        
+        outliers_filename = args.outliers.split(".trk")[0] + "_" + str(thresh[i]) + ".trk"
+        if args.outliers is None:
+            outliers_filename = append_text_to_filename(args.tractogram, "_outliers"+"_" + str(thresh[i]))
 
-    outliers_filename = args.outliers
-    if args.outliers is None:
-        outliers_filename = append_text_to_filename(args.tractogram, "_outliers")
-
-    save_tractogram(pjoin(args.out, outliers_filename), outliers, [], [], hdr)
+        save_tractogram(pjoin(args.out, outliers_filename), outliers, [], [], hdr)
 
 
 if __name__ == "__main__":
