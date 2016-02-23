@@ -10,7 +10,7 @@ import os.path as path
 from glob import glob
 from dipy.io.trackvis import load_trk
 from dipy.segment.bundles import qbx_with_merge
-from ipdb import set_trace
+#from ipdb import set_trace
 
 
 def check_range(streamline, lt, gt):

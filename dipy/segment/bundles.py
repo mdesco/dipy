@@ -16,7 +16,7 @@ from dipy.align.bundlemin import distance_matrix_mdf
 from time import time
 from itertools import chain
 from scipy.spatial import cKDTree
-from ipdb import set_trace
+#from ipdb import set_trace
 
 
 def check_range(streamline, gt, lt):
