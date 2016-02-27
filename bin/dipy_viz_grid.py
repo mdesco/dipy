@@ -58,15 +58,22 @@ def main():
         s = profile.split("/")
         print(profile)
         p = np.load(profile)
-        x = np.linspace(0, 1)
-        p = np.sin(4 * np.pi * x) * np.exp(-5 * x)
-        print(p)
-        fig = plt.figure(figsize=(400/300, 300/300), dpi=300)
+        #x = np.linspace(0, 1)
+        #p = np.sin(4 * np.pi * x) * np.exp(-5 * x)
+        fig = plt.figure(figsize=(800/300, 500/300), dpi=300)
         ax = fig.add_subplot(111)
         ax.set_title("FA tract profile")
         ax.set_title(s[1])
-        ax.fill(p, 'r')
+        ax.fill_between(np.arange(p[0].shape[0]), 
+                        p[0] - p[1], p[0] + p[1], 
+                        facecolor='y', alpha=0.5)
+                        #facecolor='0.75', alpha=1)
+
+        ax.plot(p[0], color='k', linewidth=5)
+        #ax.fill(p[0], 'r')
         ax.grid(True)
+        color=(0.5,0.5,0.5)
+        ax.set_axis_bgcolor(color)  
         arr = utils.matplotlib_figure_to_numpy(fig, dpi=300, transparent=True)
         plt.close(fig)
         figure_actor = actor.figure(arr, interpolation='cubic')
@@ -81,7 +88,7 @@ def main():
     grid = actor.grid(actors, texts, cell_padding=(50, 100), cell_shape="rect")
     ren.add(grid)
 
-    ren.reset_camera_tight()
+    #ren.reset_camera_tight()
     show_m = window.ShowManager(ren, 
                                 interactor_style=interactor.InteractorStyleBundlesGrid(actor))
     show_m.start()
