@@ -2,12 +2,13 @@ from __future__ import division
 
 from itertools import izip
 
-from dipy.viz import window, actor
+from dipy.viz import window, actor, utils
 from dipy.viz.colormap import distinguishable_colormap
-
-
 from dipy.viz import interactor
 from dipy.viz.utils import auto_orient
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 import nibabel as nib
 import sys
@@ -16,7 +17,8 @@ import glob
 verbose=False
 def main():
     print(glob.glob(sys.argv[1]))
-    
+    print(glob.glob(sys.argv[2]))
+
     streamlines = []
     for tracts in glob.glob(sys.argv[1]) :        
         if verbose :
@@ -28,36 +30,53 @@ def main():
 
     ren = window.Renderer()
     ren.background(bg)
+    ren.background((0.7, 0.7, 0.7))
     ren.projection("parallel")
 
     actors = []
     texts = []
-    for cluster, color, tracts in izip(streamlines, colormap, glob.glob(sys.argv[1])):
+    for cluster, color, tracts, profile in izip(streamlines, colormap, 
+                                                glob.glob(sys.argv[1]), glob.glob(sys.argv[2])):
         if verbose :
             print color
+
         stream_actor = actor.line(cluster, [color]*len(cluster), linewidth=1)
         pretty_actor = auto_orient(stream_actor, ren.camera_direction(), 
                                    data_up=(0, 0, 1), show_bounds=True)
         pretty_actor_aabb = auto_orient(stream_actor, ren.camera_direction(), 
                                         bbox_type="AABB", show_bounds=True)
-
-#        actors.append(stream_actor)
-#        actors.append(pretty_actor_aabb)
         actors.append(pretty_actor)
 
-#         text = actor.text_3d(str(len(cluster)), font_size=32, 
-#                              justification="center", vertical_justification="top")
-#         texts.append(text)
-
-#         text = actor.text_3d("AABB", font_size=32, 
-#                              justification="center", vertical_justification="top")
-#         texts.append(text)
-
-#         text = actor.text_3d("OBB", font_size=32, 
-#                              justification="center", vertical_justification="top")
-        text = actor.text_3d(tracts, font_size=32, 
+        s = tracts.split("/")
+        print(s)
+        text = actor.text_3d("Bundle i", font_size=60, 
+                             justification="center", vertical_justification="top")
+        text = actor.text_3d(s[1], font_size=60, 
                              justification="center", vertical_justification="top")
         texts.append(text)
+
+        s = profile.split("/")
+        print(profile)
+        p = np.load(profile)
+        x = np.linspace(0, 1)
+        p = np.sin(4 * np.pi * x) * np.exp(-5 * x)
+        print(p)
+        fig = plt.figure(figsize=(400/300, 300/300), dpi=300)
+        ax = fig.add_subplot(111)
+        ax.set_title("FA tract profile")
+        ax.set_title(s[1])
+        ax.fill(p, 'r')
+        ax.grid(True)
+        arr = utils.matplotlib_figure_to_numpy(fig, dpi=300, transparent=True)
+        plt.close(fig)
+        figure_actor = actor.figure(arr, interpolation='cubic')
+        actors.append(figure_actor)
+        text = actor.text_3d('', font_size=32, 
+                             justification="center", vertical_justification="top")
+        texts.append(text)
+
+        #ren.add(figure_actor)
+
 
     grid = actor.grid(actors, texts, cell_padding=(50, 100), cell_shape="rect")
     ren.add(grid)
