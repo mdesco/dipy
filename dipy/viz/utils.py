@@ -15,7 +15,8 @@ from dipy.utils.optpkg import optional_package
 # Allow import, but disable doctests if we don't have vtk
 vtk, have_vtk, setup_module = optional_package('vtk')
 ns, have_numpy_support, _ = optional_package('vtk.util.numpy_support')
-_, have_imread, _ = optional_package('Image')
+#_, have_imread, _ = optional_package('Image')
+have_imread = True
 matplotlib, have_mpl, _ = optional_package("matplotlib")
 
 if have_imread:

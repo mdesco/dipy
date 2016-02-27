@@ -259,8 +259,8 @@ def test_odf_slicer():
 
 @npt.dec.skipif(not actor.have_vtk)
 @npt.dec.skipif(not actor.have_vtk_colors)
-@npt.dec.skipif(not window.have_imread)
-@npt.dec.skipif(not utils.have_mpl)
+#@npt.dec.skipif(not window.have_imread)
+#@npt.dec.skipif(not utils.have_mpl)
 def test_figure():
 
     renderer = window.renderer()
@@ -310,7 +310,7 @@ def test_figure():
     axes_actor.SetPosition(500, 400, -50)
 
     # renderer.add(axes_actor)
-    # window.show(renderer)
+    window.show(renderer)
     renderer.reset_camera()
 
     props = renderer.GetViewProps()
@@ -407,5 +407,6 @@ def test_text_3d():
     show_m.start()
 
 if __name__ == "__main__":
-    test_text_3d()
+    #test_text_3d()
+    test_figure()
     #npt.run_module_suite()
