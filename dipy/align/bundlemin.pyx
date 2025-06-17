@@ -5,23 +5,26 @@
 
 import numpy as np
 cimport numpy as cnp
-cimport cython
 
 cimport safe_openmp as openmp
 from safe_openmp cimport have_openmp
 
 from cython.parallel import prange
 from libc.stdlib cimport malloc, free
-from libc.math cimport sqrt, sin, cos
+from libc.math cimport sqrt
 
+from dipy.utils.omp import determine_num_threads
+from dipy.utils.omp cimport set_num_threads, restore_default_num_threads
 
 cdef cnp.dtype f64_dt = np.dtype(np.float64)
 
 
 cdef double min_direct_flip_dist(double *a,double *b,
-                                 cnp.npy_intp rows) nogil:
-    r""" Minimum of direct and flip average (MDF) distance [Garyfallidis12]
-    between two streamlines.
+                                 cnp.npy_intp rows) noexcept nogil:
+    r""" Minimum of direct and flip average (MDF) distance between two
+    streamlines.
+
+    See :footcite:p:`Garyfallidis2012a` for a definition of the distance.
 
     Parameters
     ----------
@@ -35,13 +38,11 @@ cdef double min_direct_flip_dist(double *a,double *b,
     Returns
     -------
     out : double
-        mininum of direct and flipped average distances
+        minimum of direct and flipped average distances
 
-    Reference
-    ---------
-    .. [Garyfallidis12] Garyfallidis E. et al., QuickBundles a method for
-                        tractography simplification, Frontiers in Neuroscience,
-                        vol 6, no 175, 2012.
+    References
+    ----------
+    .. footbibliography::
     """
 
     cdef:
@@ -73,31 +74,33 @@ def _bundle_minimum_distance_matrix(double [:, ::1] static,
                                     cnp.npy_intp static_size,
                                     cnp.npy_intp moving_size,
                                     cnp.npy_intp rows,
-                                    double [:, ::1] D):
+                                    double [:, ::1] D,
+                                    num_threads=None):
     """ MDF-based pairwise distance optimization function
 
     We minimize the distance between moving streamlines of the same number of
     points as they align with the static streamlines.
 
     Parameters
-    -----------
+    ----------
     static: array
         Static streamlines
-
     moving: array
         Moving streamlines
-
     static_size : int
         Number of static streamlines
-
     moving_size : int
         Number of moving streamlines
-
     rows : int
         Number of points per streamline
-
     D : 2D array
         Distance matrix
+    num_threads : int, optional
+        Number of threads to be used for OpenMP parallelization. If None
+        (default) the value of OMP_NUM_THREADS environment variable is used
+        if it is set, otherwise all available threads are used. If < 0 the
+        maximal number of threads minus |num_threads + 1| is used (enter -1 to
+        use as many threads as possible). 0 raises an error.
 
     Returns
     -------
@@ -106,46 +109,55 @@ def _bundle_minimum_distance_matrix(double [:, ::1] static,
 
     cdef:
         cnp.npy_intp i=0, j=0, mov_i=0, mov_j=0
+        int threads_to_use = -1
+
+    threads_to_use = determine_num_threads(num_threads)
+    set_num_threads(threads_to_use)
 
     with nogil:
 
         for i in prange(static_size):
-
             for j in prange(moving_size):
 
                 D[i, j] = min_direct_flip_dist(&static[i * rows, 0],
                                                &moving[j * rows, 0],
                                                rows)
 
+    if num_threads is not None:
+        restore_default_num_threads()
+
     return np.asarray(D)
 
 
-def _bundle_minimum_distance(double [:, ::1] stat,
-                             double [:, ::1] mov,
+def _bundle_minimum_distance(double [:, ::1] static,
+                             double [:, ::1] moving,
                              cnp.npy_intp static_size,
                              cnp.npy_intp moving_size,
-                             cnp.npy_intp rows):
+                             cnp.npy_intp rows,
+                             num_threads=None):
     """ MDF-based pairwise distance optimization function
 
     We minimize the distance between moving streamlines of the same number of
     points as they align with the static streamlines.
 
     Parameters
-    -----------
+    ----------
     static : array
         Static streamlines
-
     moving : array
         Moving streamlines
-
     static_size : int
         Number of static streamlines
-
     moving_size : int
         Number of moving streamlines
-
     rows : int
         Number of points per streamline
+    num_threads : int, optional
+        Number of threads to be used for OpenMP parallelization. If None
+        (default) the value of OMP_NUM_THREADS environment variable is used
+        if it is set, otherwise all available threads are used. If < 0 the
+        maximal number of threads minus |num_threads + 1| is used (enter -1 to
+        use as many threads as possible). 0 raises an error.
 
     Returns
     -------
@@ -164,7 +176,11 @@ def _bundle_minimum_distance(double [:, ::1] stat,
         double dist=0
         double * min_j
         double * min_i
-        cdef openmp.omp_lock_t lock
+        openmp.omp_lock_t lock
+        int threads_to_use = -1
+
+    threads_to_use = determine_num_threads(num_threads)
+    set_num_threads(threads_to_use)
 
     with nogil:
 
@@ -184,8 +200,8 @@ def _bundle_minimum_distance(double [:, ::1] stat,
 
             for j in range(moving_size):
 
-                tmp = min_direct_flip_dist(&stat[i * rows, 0],
-                                       &mov[j * rows, 0], rows)
+                tmp = min_direct_flip_dist(&static[i * rows, 0],
+                                       &moving[j * rows, 0], rows)
 
                 if have_openmp:
                     openmp.omp_set_lock(&lock)
@@ -213,12 +229,103 @@ def _bundle_minimum_distance(double [:, ::1] stat,
 
         dist = 0.25 * dist * dist
 
+    if num_threads is not None:
+        restore_default_num_threads()
+
+    return dist
+
+
+
+def _bundle_minimum_distance_asymmetric(double [:, ::1] static,
+                                        double [:, ::1] moving,
+                                        cnp.npy_intp static_size,
+                                        cnp.npy_intp moving_size,
+                                        cnp.npy_intp rows):
+    """ MDF-based pairwise distance optimization function
+
+    We minimize the distance between moving streamlines of the same number of
+    points as they align with the static streamlines.
+
+    Parameters
+    ----------
+    static : array
+        Static streamlines
+    moving : array
+        Moving streamlines
+    static_size : int
+        Number of static streamlines
+    moving_size : int
+        Number of moving streamlines
+    rows : int
+        Number of points per streamline
+
+    Returns
+    -------
+    cost : double
+
+    Notes
+    -----
+    The difference with ``_bundle_minimum_distance`` is that we sum the
+    minimum values only for the static. Therefore, this is an asymmetric
+    distance metric. This means that we are weighting only one direction of the
+    registration. Not both directions. This can be very useful when we want
+    to register a big set of bundles to a small set of bundles.
+    See :footcite:p:`Wanyan2017`.
+
+    References
+    ----------
+    .. footbibliography::
+
+    """
+
+    cdef:
+        cnp.npy_intp i=0, j=0
+        double sum_i=0, sum_j=0, tmp=0
+        double inf = np.finfo('f8').max
+        double dist=0
+        double * min_j
+        openmp.omp_lock_t lock
+
+    with nogil:
+
+        if have_openmp:
+            openmp.omp_init_lock(&lock)
+
+        min_j = <double *> malloc(static_size * sizeof(double))
+
+        for sz_i in range(static_size):
+            min_j[sz_i] = inf
+
+        for i in prange(static_size):
+
+            for j in range(moving_size):
+
+                tmp = min_direct_flip_dist(&static[i * rows, 0],
+                                           &moving[j * rows, 0], rows)
+
+                if have_openmp:
+                    openmp.omp_set_lock(&lock)
+                if tmp < min_j[i]:
+                    min_j[i] = tmp
+
+                if have_openmp:
+                    openmp.omp_unset_lock(&lock)
+
+        if have_openmp:
+            openmp.omp_destroy_lock(&lock)
+
+        for i in range(static_size):
+            sum_i += min_j[i]
+
+        free(min_j)
+
+        dist = sum_i / <double>static_size
+
     return dist
 
 
 def distance_matrix_mdf(streamlines_a, streamlines_b):
-    r''' Calculate distance matrix between two sets of streamlines using the
-    minimum direct flipped distance.
+    r""" Minimum direct flipped distance matrix between two streamline sets
 
     All streamlines need to have the same number of points
 
@@ -233,13 +340,12 @@ def distance_matrix_mdf(streamlines_a, streamlines_b):
     -------
     DM : array, shape (len(streamlines_a), len(streamlines_b))
         distance matrix
-
-    '''
+    """
     cdef:
-        size_t i, j, lentA, lentB
+        cnp.npy_intp i, j, lentA, lentB
     # preprocess tracks
     cdef:
-        size_t longest_track_len = 0, track_len
+        cnp.npy_intp longest_track_len = 0, track_len
         longest_track_lenA, longest_track_lenB
         cnp.ndarray[object, ndim=1] tracksA64
         cnp.ndarray[object, ndim=1] tracksB64
@@ -261,20 +367,22 @@ def distance_matrix_mdf(streamlines_a, streamlines_b):
         tracksB64[i] = np.ascontiguousarray(streamlines_b[i], dtype=f64_dt)
     # preallocate buffer array for track distance calculations
     cdef:
-        cnp.float64_t *t1_ptr, *t2_ptr, *min_buffer
+        cnp.float64_t *t1_ptr
+        cnp.float64_t *t2_ptr
+        cnp.float64_t *min_buffer
     # cycle over tracks
     cdef:
         cnp.ndarray [cnp.float64_t, ndim=2] t1, t2
-        size_t t1_len, t2_len
+        cnp.npy_intp t1_len, t2_len
         double d[2]
     t_len = tracksA64[0].shape[0]
 
     for i from 0 <= i < lentA:
         t1 = tracksA64[i]
-        t1_ptr = <cnp.float64_t *>t1.data
+        t1_ptr = <cnp.float64_t *> cnp.PyArray_DATA(t1)
         for j from 0 <= j < lentB:
             t2 = tracksB64[j]
-            t2_ptr = <cnp.float64_t *>t2.data
+            t2_ptr = <cnp.float64_t *> cnp.PyArray_DATA(t2)
 
             DM[i, j] = min_direct_flip_dist(t1_ptr, t2_ptr,t_len)
 

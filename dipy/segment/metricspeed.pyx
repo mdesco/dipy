@@ -1,18 +1,20 @@
-# distutils: language = c
 # cython: wraparound=False, cdivision=True, boundscheck=False
 
 import numpy as np
-cimport numpy as np
+cimport numpy as cnp
 
-from libc.math cimport sqrt
+from libc.math cimport sqrt, acos
 
-from cythonutils cimport tuple2shape, shape2tuple, same_shape
-from featurespeed cimport IdentityFeature
+from dipy.segment.cythonutils cimport tuple2shape, shape2tuple, same_shape
+from dipy.segment.featurespeed cimport IdentityFeature
 
 DEF biggest_double = 1.7976931348623157e+308  #  np.finfo('f8').max
 
+import math
+cdef double PI = math.pi
 
-cdef class Metric(object):
+
+cdef class Metric:
     """ Computes a distance between two sequential data.
 
     A sequence of N-dimensional points is represented as a 2D array with
@@ -44,15 +46,17 @@ cdef class Metric(object):
         def __get__(Metric self):
             return bool(self.is_order_invariant)
 
-    cdef int c_are_compatible(Metric self, Shape shape1, Shape shape2) nogil except -1:
+    cdef int c_are_compatible(Metric self, Shape shape1, Shape shape2) except -1 nogil:
         """ Cython version of `Metric.are_compatible`. """
         with gil:
             return self.are_compatible(shape2tuple(shape1), shape2tuple(shape2))
 
-    cdef double c_dist(Metric self, Data2D features1, Data2D features2) nogil except -1:
+    cdef double c_dist(Metric self, Data2D features1, Data2D features2) except -1 nogil:
         """ Cython version of `Metric.dist`. """
         with gil:
-            return self.dist(np.asarray(features1), np.asarray(features2))
+            _features1 = np.asarray(<float[:features1.shape[0], :features1.shape[1]]> <float*> features1._data)
+            _features2 = np.asarray(<float[:features2.shape[0], :features2.shape[1]]> <float*> features2._data)
+            return self.dist(_features1, _features2)
 
     cpdef are_compatible(Metric self, shape1, shape2):
         """ Checks if features can be used by `metric.dist` based on their shape.
@@ -62,9 +66,9 @@ cdef class Metric(object):
 
         Parameters
         ----------
-        shape1 : tuple
+        shape1 : int, 1-tuple or 2-tuple
             shape of the first data point's features
-        shape2 : tuple
+        shape2 : int, 1-tuple or 2-tuple
             shape of the second data point's features
 
         Returns
@@ -118,9 +122,9 @@ cdef class CythonMetric(Metric):
 
         Parameters
         ----------
-        shape1 : tuple
+        shape1 : int, 1-tuple or 2-tuple
             Shape of the first data point's features.
-        shape2 : tuple
+        shape2 : int, 1-tuple or 2-tuple
             Shape of the second data point's features.
 
         Returns
@@ -132,6 +136,16 @@ cdef class CythonMetric(Metric):
         -----
         This method calls its Cython version `self.c_are_compatible` accordingly.
         """
+        if np.asarray(shape1).ndim == 0:
+            shape1 = (1, shape1)
+        elif len(shape1) == 1:
+            shape1 = (1,) + shape1
+
+        if np.asarray(shape2).ndim == 0:
+            shape2 = (1, shape2)
+        elif len(shape2) == 1:
+            shape2 = (1,) + shape2
+
         return self.c_are_compatible(tuple2shape(shape1), tuple2shape(shape2)) == 1
 
     cpdef double dist(CythonMetric self, features1, features2) except -1:
@@ -153,6 +167,29 @@ cdef class CythonMetric(Metric):
         -----
         This method calls its Cython version `self.c_dist` accordingly.
         """
+        # If needed, we convert features to 2D arrays.
+        features1 = np.asarray(features1)
+        if features1.ndim == 0:
+            features1 = features1[np.newaxis, np.newaxis]
+        elif features1.ndim == 1:
+            features1 = features1[np.newaxis]
+        elif features1.ndim == 2:
+            pass
+        else:
+            raise TypeError("Only scalar, 1D or 2D array features are"
+                            " supported for parameter 'features1'!")
+
+        features2 = np.asarray(features2)
+        if features2.ndim == 0:
+            features2 = features2[np.newaxis, np.newaxis]
+        elif features2.ndim == 1:
+            features2 = features2[np.newaxis]
+        elif features2.ndim == 2:
+            pass
+        else:
+            raise TypeError("Only scalar, 1D or 2D array features are"
+                            " supported for parameter 'features2'!")
+
         if not self.are_compatible(features1.shape, features2.shape):
             raise ValueError("Features are not compatible according to this metric!")
 
@@ -191,7 +228,7 @@ cdef class SumPointwiseEuclideanMetric(CythonMetric):
     is equal to $a+b+c$ where $a$ is the Euclidean distance between s1[0] and
     s2[0], $b$ between s1[1] and s2[1] and $c$ between s1[2] and s2[2].
     """
-    cdef double c_dist(SumPointwiseEuclideanMetric self, Data2D features1, Data2D features2) nogil except -1:
+    cdef double c_dist(SumPointwiseEuclideanMetric self, Data2D features1, Data2D features2) except -1 nogil:
         cdef :
             int N = features1.shape[0], D = features1.shape[1]
             int n, d
@@ -207,7 +244,7 @@ cdef class SumPointwiseEuclideanMetric(CythonMetric):
 
         return dist
 
-    cdef int c_are_compatible(SumPointwiseEuclideanMetric self, Shape shape1, Shape shape2) nogil except -1:
+    cdef int c_are_compatible(SumPointwiseEuclideanMetric self, Shape shape1, Shape shape2) except -1 nogil:
         return same_shape(shape1, shape2)
 
 
@@ -243,7 +280,7 @@ cdef class AveragePointwiseEuclideanMetric(SumPointwiseEuclideanMetric):
     is equal to $(a+b+c)/3$ where $a$ is the Euclidean distance between s1[0] and
     s2[0], $b$ between s1[1] and s2[1] and $c$ between s1[2] and s2[2].
     """
-    cdef double c_dist(AveragePointwiseEuclideanMetric self, Data2D features1, Data2D features2) nogil except -1:
+    cdef double c_dist(AveragePointwiseEuclideanMetric self, Data2D features1, Data2D features2) except -1 nogil:
         cdef int N = features1.shape[0]
         cdef double dist = SumPointwiseEuclideanMetric.c_dist(self, features1, features2)
         return dist / N
@@ -276,18 +313,58 @@ cdef class MinimumAverageDirectFlipMetric(AveragePointwiseEuclideanMetric):
     and s2[2], $a'$ between s1[0] and s2[2], $b'$ between s1[1] and s2[1]
     and $c'$ between s1[2] and s2[0].
     """
-    def __init__(MinimumAverageDirectFlipMetric self):
-        super(MinimumAverageDirectFlipMetric, self).__init__(feature=IdentityFeature())
-
     property is_order_invariant:
         """ Is this metric invariant to the sequence's ordering """
         def __get__(MinimumAverageDirectFlipMetric self):
             return True  # Ordering is handled in the distance computation
 
-    cdef double c_dist(MinimumAverageDirectFlipMetric self, Data2D features1, Data2D features2) nogil except -1:
+    cdef double c_dist(MinimumAverageDirectFlipMetric self, Data2D features1, Data2D features2) except -1 nogil:
         cdef double dist_direct = AveragePointwiseEuclideanMetric.c_dist(self, features1, features2)
         cdef double dist_flipped = AveragePointwiseEuclideanMetric.c_dist(self, features1, features2[::-1])
         return min(dist_direct, dist_flipped)
+
+
+cdef class CosineMetric(CythonMetric):
+    r""" Computes the cosine distance between two vectors.
+
+    A vector (i.e. a N-dimensional point) is represented as a 2D array with
+    shape (1, nb_dimensions).
+
+    Notes
+    -----
+    The distance between two vectors $v_1$ and $v_2$ is equal to
+    $\frac{1}{\pi} \arccos\left(\frac{v_1 \cdot v_2}{\|v_1\| \|v_2\|}\right)$
+    and is bounded within $[0,1]$.
+    """
+    def __init__(CosineMetric self, Feature feature):
+        super(CosineMetric, self).__init__(feature=feature)
+
+    cdef int c_are_compatible(CosineMetric self, Shape shape1, Shape shape2) except -1 nogil:
+        return same_shape(shape1, shape2) != 0 and shape1.dims[0] == 1
+
+    cdef double c_dist(CosineMetric self, Data2D features1, Data2D features2) except -1 nogil:
+        cdef :
+            int d, D = features1.shape[1]
+            double sqr_norm_features1 = 0.0, sqr_norm_features2 = 0.0
+            double cos_theta = 0.0
+
+        for d in range(D):
+            cos_theta += features1[0, d] * features2[0, d]
+            sqr_norm_features1 += features1[0, d] * features1[0, d]
+            sqr_norm_features2 += features2[0, d] * features2[0, d]
+
+        if sqr_norm_features1 == 0.:
+            if sqr_norm_features2 == 0.:
+                return 0.
+            else:
+                return 1.
+
+        cos_theta /= sqrt(sqr_norm_features1) * sqrt(sqr_norm_features2)
+
+        # Make sure it's in [-1, 1], i.e. within domain of arccosine
+        cos_theta = min(cos_theta, 1.)
+        cos_theta = max(cos_theta, -1.)
+        return acos(cos_theta) / PI  # Normalized cosine distance
 
 
 cpdef distance_matrix(Metric metric, data1, data2=None):
@@ -313,7 +390,7 @@ cpdef distance_matrix(Metric metric, data1, data2=None):
     2D array (double)
         Distance matrix.
     """
-    cdef int i, j
+    cdef cnp.npy_intp i, j
     if data2 is None:
         data2 = data1
 
@@ -354,18 +431,14 @@ cpdef double dist(Metric metric, datum1, datum2) except -1:
     double
         Distance between two data points.
     """
-    shape1 = metric.feature.infer_shape(datum1)
-    shape2 = metric.feature.infer_shape(datum2)
-
-    if not metric.are_compatible(shape1, shape2):
-        raise ValueError("Data features' shapes must be compatible!")
-
     datum1 = datum1 if datum1.flags.writeable and datum1.dtype is np.float32 else datum1.astype(np.float32)
     datum2 = datum2 if datum2.flags.writeable and datum2.dtype is np.float32 else datum2.astype(np.float32)
 
     cdef:
-        Data2D features1 = np.empty(shape1, np.float32)
-        Data2D features2 = np.empty(shape2, np.float32)
+        Shape shape1 = metric.feature.c_infer_shape(datum1)
+        Shape shape2 = metric.feature.c_infer_shape(datum2)
+        Data2D features1 = np.empty(shape2tuple(shape1), np.float32)
+        Data2D features2 = np.empty(shape2tuple(shape2), np.float32)
 
     metric.feature.c_extract(datum1, features1)
     metric.feature.c_extract(datum2, features2)

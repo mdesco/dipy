@@ -7,7 +7,7 @@
 import numpy as np
 cimport cython
 cimport numpy as cnp
-from fused_types cimport floating, number
+from dipy.align.fused_types cimport floating
 cdef extern from "dpy_math.h" nogil:
     int dpy_isinf(double)
     double floor(double)
@@ -16,17 +16,18 @@ cdef inline int ifloor(double x) nogil:
     return int(floor(x))
 
 def quantize_positive_2d(floating[:, :] v, int num_levels):
-    r"""Quantizes a 2D image to num_levels quantization levels
+    """Quantize a 2D image to num_levels quantization levels.
 
     Quantizes the input image at num_levels intensity levels considering <=0
     as a special value. Those input pixels <=0, and only those, will be
     assigned a quantization level of 0. The positive values are divided into
-    the remaining num_levels-1 uniform quanization levels.
+    the remaining num_levels-1 uniform quantization levels.
 
-    The following are undefined, and raise a ValueError:
-    * Quantizing at zero levels because at least one level must be assigned
-    * Quantizing at one level because positive values should be assigned a
-      level different from the secial level 0 (at least 2 levels are needed)
+    The following are undefined, and raise a ValueError::
+
+        * Quantizing at zero levels because at least one level must be assigned
+        * Quantizing at one level because positive values should be assigned a
+          level different from the special level 0 (at least 2 levels are needed)
 
     Parameters
     ----------
@@ -39,13 +40,14 @@ def quantize_positive_2d(floating[:, :] v, int num_levels):
     -------
     out : array, shape (R, C), same shape as v
         the quantized image
-    levels: array, shape (num_levels,)
+    levels : array, shape (num_levels,)
         the quantization values: levels[0]=0, and levels[i] is the mid-point
         of the interval of intensities that are assigned to quantization
         level i, i=1, ..., num_levels-1.
-    hist: array, shape (num_levels,)
+    hist : array, shape (num_levels,)
         histogram: the number of pixels that were assigned to each quantization
         level
+
     """
     ftype = np.asarray(v).dtype
     cdef:
@@ -56,15 +58,17 @@ def quantize_positive_2d(floating[:, :] v, int num_levels):
         double epsilon, delta
         double min_val = -1
         double max_val = -1
-        int[:] hist = np.zeros(shape=(num_levels,), dtype=np.int32)
-        int[:, :] out = np.zeros(shape=(nrows, ncols,), dtype=np.int32)
+        cnp.npy_int32[:] hist = np.zeros(shape=(num_levels,), dtype=np.int32)
+        cnp.npy_int32[:, :] out = np.zeros(shape=(nrows, ncols,), dtype=np.int32)
         floating[:] levels = np.zeros(shape=(num_levels,), dtype=ftype)
 
     #Quantizing at zero levels is undefined
     #Quantizing at one level is not supported because we want to make sure the
     #maximum level in the quantization is never greater than num_levels-1
-    if(num_levels < 2):
+    if num_levels < 2:
         raise ValueError('Quantization levels must be at least 2')
+    if num_levels >= 2**31:
+        raise ValueError('Quantization levels must be < 2**31')
 
     num_levels -= 1  # zero is one of the levels
 
@@ -72,19 +76,19 @@ def quantize_positive_2d(floating[:, :] v, int num_levels):
 
         for i in range(nrows):
             for j in range(ncols):
-                if(v[i, j] > 0):
-                    if((min_val < 0) or (v[i, j] < min_val)):
+                if v[i, j] > 0:
+                    if min_val < 0 or v[i, j] < min_val:
                         min_val = v[i, j]
-                    if(v[i, j] > max_val):
+                    if v[i, j] > max_val:
                         max_val = v[i, j]
         epsilon = 1e-8
         delta = (max_val - min_val + epsilon) / num_levels
         # notice that we decreased num_levels, so levels[0..num_levels] are well
         # defined
-        if((num_levels < 2) or (delta < epsilon)):
+        if num_levels < 2 or delta < epsilon:
             for i in range(nrows):
                 for j in range(ncols):
-                    if(v[i, j] > 0):
+                    if v[i, j] > 0:
                         out[i, j] = 1
                     else:
                         out[i, j] = 0
@@ -101,7 +105,7 @@ def quantize_positive_2d(floating[:, :] v, int num_levels):
             levels[i] = levels[i - 1] + delta
         for i in range(nrows):
             for j in range(ncols):
-                if(v[i, j] > 0):
+                if v[i, j] > 0:
                     l = ifloor((v[i, j] - min_val) / delta)
                     out[i, j] = l + 1
                     hist[l + 1] += 1
@@ -109,21 +113,22 @@ def quantize_positive_2d(floating[:, :] v, int num_levels):
                     out[i, j] = 0
                     hist[0] += 1
 
-    return out, levels, hist
+    return np.asarray(out), np.array(levels), np.array(hist)
 
 
 def quantize_positive_3d(floating[:, :, :] v, int num_levels):
-    r"""Quantizes a 3D volume to num_levels quantization levels
+    """Quantize a 3D volume to num_levels quantization levels.
 
-    Quantizes the input volume at num_levels intensity levels considering <=0
+    Quantize the input volume at num_levels intensity levels considering <=0
     as a special value. Those input voxels <=0, and only those, will be
     assigned a quantization level of 0. The positive values are divided into
-    the remaining num_levels-1 uniform quanization levels.
+    the remaining num_levels-1 uniform quantization levels.
 
-    The following are undefined, and raise a ValueError:
-    * Quantizing at zero levels because at least one level must be assigned
-    * Quantizing at one level because positive values should be assigned a
-      level different from the secial level 0 (at least 2 levels are needed)
+    The following are undefined, and raise a ValueError::
+
+        * Quantizing at zero levels because at least one level must be assigned
+        * Quantizing at one level because positive values should be assigned a
+          level different from the special level 0 (at least 2 levels are needed)
 
     Parameters
     ----------
@@ -136,13 +141,14 @@ def quantize_positive_3d(floating[:, :, :] v, int num_levels):
     -------
     out : array, shape (S, R, C), same shape as v
         the quantized volume
-    levels: array, shape (num_levels,)
+    levels : array, shape (num_levels,)
         the quantization values: levels[0]=0, and levels[i] is the mid-point
         of the interval of intensities that are assigned to quantization
         level i, i=1, ..., num_levels-1.
-    hist: array, shape (num_levels,)
+    hist : array, shape (num_levels,)
         histogram: the number of voxels that were assigned to each quantization
         level
+
     """
     ftype = np.asarray(v).dtype
     cdef:
@@ -162,7 +168,7 @@ def quantize_positive_3d(floating[:, :, :] v, int num_levels):
     #Quantizing at zero levels is undefined
     #Quantizing at one level is not supported because we want to make sure the
     #maximum level in the quantization is never greater than num_levels-1
-    if(num_levels < 2):
+    if num_levels < 2:
         raise ValueError('Quantization levels must be at least 2')
 
     num_levels -= 1  # zero is one of the levels
@@ -172,20 +178,20 @@ def quantize_positive_3d(floating[:, :, :] v, int num_levels):
         for k in range(nslices):
             for i in range(nrows):
                 for j in range(ncols):
-                    if(v[k, i, j] > 0):
-                        if((min_val < 0) or (v[k, i, j] < min_val)):
+                    if v[k, i, j] > 0:
+                        if min_val < 0 or v[k, i, j] < min_val:
                             min_val = v[k, i, j]
-                        if(v[k, i, j] > max_val):
+                        if v[k, i, j] > max_val:
                             max_val = v[k, i, j]
         epsilon = 1e-8
         delta = (max_val - min_val + epsilon) / num_levels
         # notice that we decreased num_levels, so levels[0..num_levels] are well
         # defined
-        if((num_levels < 2) or (delta < epsilon)):
+        if num_levels < 2 or delta < epsilon:
             for k in range(nslices):
                 for i in range(nrows):
                     for j in range(ncols):
-                        if(v[k, i, j] > 0):
+                        if v[k, i, j] > 0:
                             out[k, i, j] = 1
                         else:
                             out[k, i, j] = 0
@@ -202,14 +208,14 @@ def quantize_positive_3d(floating[:, :, :] v, int num_levels):
         for k in range(nslices):
             for i in range(nrows):
                 for j in range(ncols):
-                    if(v[k, i, j] > 0):
+                    if v[k, i, j] > 0:
                         l = ifloor((v[k, i, j] - min_val) / delta)
                         out[k, i, j] = l + 1
                         hist[l + 1] += 1
                     else:
                         out[k, i, j] = 0
                         hist[0] += 1
-    return out, levels, hist
+    return np.asarray(out), np.asarray(levels), np.asarray(hist)
 
 
 def compute_masked_class_stats_2d(int[:, :] mask, floating[:, :] v,
@@ -243,7 +249,7 @@ def compute_masked_class_stats_2d(int[:, :] mask, floating[:, :] v,
     variances : array, shape (num_labels,)
         variances[i], 0<=i<num_labels will be the standard deviation of the
         intensities in v of all voxels labeled i, or infinite if less than 2
-        voxels are labeld i.
+        voxels are labeled i.
     """
     ftype=np.asarray(v).dtype
     cdef:
@@ -259,24 +265,24 @@ def compute_masked_class_stats_2d(int[:, :] mask, floating[:, :] v,
     with nogil:
         for i in range(nrows):
             for j in range(ncols):
-                if(mask[i, j] != 0):
+                if mask[i, j] != 0:
                     means[labels[i, j]] += v[i, j]
                     counts[labels[i, j]] += 1
         for i in range(num_labels):
-            if(counts[i] > 0):
+            if counts[i] > 0:
                 means[i] /= counts[i]
         for i in range(nrows):
             for j in range(ncols):
-                if(mask[i, j] != 0):
+                if mask[i, j] != 0:
                     diff = v[i, j] - means[labels[i, j]]
                     variances[labels[i, j]] += diff ** 2
 
         for i in range(num_labels):
-            if(counts[i] > 1):
+            if counts[i] > 1:
                 variances[i] /= counts[i]
             else:
                 variances[i] = INF64
-    return means, variances
+    return np.asarray(means), np.asarray(variances)
 
 
 def compute_masked_class_stats_3d(int[:, :, :] mask, floating[:, :, :] v,
@@ -310,7 +316,7 @@ def compute_masked_class_stats_3d(int[:, :, :] mask, floating[:, :, :] v,
     variances : array, shape (num_labels,)
         variances[i], 0<=i<num_labels will be the standard deviation of the
         intensities in v of all voxels labeled i, or infinite if less than 2
-        voxels are labeld i.
+        voxels are labeled i.
     """
     ftype=np.asarray(v).dtype
     cdef:
@@ -328,24 +334,24 @@ def compute_masked_class_stats_3d(int[:, :, :] mask, floating[:, :, :] v,
         for k in range(nslices):
             for i in range(nrows):
                 for j in range(ncols):
-                    if(mask[k, i, j] != 0):
+                    if mask[k, i, j] != 0:
                         means[labels[k, i, j]] += v[k, i, j]
                         counts[labels[k, i, j]] += 1
         for i in range(num_labels):
-            if(counts[i] > 0):
+            if counts[i] > 0:
                 means[i] /= counts[i]
         for k in range(nslices):
             for i in range(nrows):
                 for j in range(ncols):
-                    if(mask[k, i, j] != 0):
+                    if mask[k, i, j] != 0:
                         diff = means[labels[k, i, j]] - v[k, i, j]
                         variances[labels[k, i, j]] += diff ** 2
         for i in range(num_labels):
-            if(counts[i] > 1):
+            if counts[i] > 1:
                 variances[i] /= counts[i]
             else:
                 variances[i] = INF64
-    return means, variances
+    return np.asarray(means), np.asarray(variances)
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -357,17 +363,18 @@ def compute_em_demons_step_2d(floating[:,:] delta_field,
                               floating[:,:,:] out):
     r"""Demons step for EM metric in 2D
 
-    Computes the demons step [Vercauteren09] for SSD-driven registration
-    ( eq. 4 in [Vercauteren09] ) using the EM algorithm [Arce14] to handle
-    multi-modality images.
+    Computes the demons step :footcite:p:`Vercauteren2009` for SSD-driven
+    registration ( eq. 4 in :footcite:p:`Vercauteren2009` ) using the EM
+    algorithm :footcite:p:`ArceSantana2014` to handle multi-modality images.
 
-    In this case, $\sigma_i$ in eq. 4 of [Vercauteren] is estimated using the EM
-    algorithm, while in the original version of diffeomorphic demons it is
-    estimated by the difference between the image values at each pixel.
+    In this case, $\sigma_i$ in eq. 4 of :footcite:p:`Vercauteren2009` is
+    estimated using the EM algorithm, while in the original version of
+    diffeomorphic demons it is estimated by the difference between the image
+    values at each pixel.
 
     Parameters
     ----------
-    delta_field : array, shape(R, C)
+    delta_field : array, shape (R, C)
         contains, at each pixel, the difference between the moving image (warped
         under the current deformation s(. , .) ) J and the static image I:
         delta_field[i,j] = J(s(i,j)) - I(i,j). The order is important, changing
@@ -375,16 +382,16 @@ def compute_em_demons_step_2d(floating[:,:] delta_field,
         warping the static image towards the moving, which may not be the
         intended behavior unless the 'gradient_moving' passed corresponds to
         the gradient of the static image
-    sigma_sq_field : array, shape(R, C)
+    sigma_sq_field : array, shape (R, C)
         contains, at each pixel (i, j), the estimated variance (not std) of the
         hidden variable associated to the intensity at static[i,j] (which must
         have been previously quantized)
-    gradient_moving : array, shape(R, C, 2)
+    gradient_moving : array, shape (R, C, 2)
         the gradient of the moving image
     sigma_sq_x : float
         parameter controlling the amount of regularization. It corresponds to
-        $\sigma_x^2$ in algorithm 1 of Vercauteren et al.[2]
-    out : array, shape(R, C, 2)
+        $\sigma_x^2$ in algorithm 1 of :footcite:p:`Vercauteren2009`
+    out : array, shape (R, C, 2)
         the resulting demons step will be written to this array
 
     Returns
@@ -397,14 +404,7 @@ def compute_em_demons_step_2d(floating[:,:] delta_field,
 
     References
     ----------
-    [Arce14] Arce-santana, E., Campos-delgado, D. U., & Vigueras-g, F. (2014).
-             Non-rigid Multimodal Image Registration Based on the
-             Expectation-Maximization Algorithm, (168140), 36-47.
-
-    [Vercauteren09] Vercauteren, T., Pennec, X., Perchant, A., & Ayache, N.
-                    (2009). Diffeomorphic demons: efficient non-parametric
-                    image registration. NeuroImage, 45(1 Suppl), S61-72.
-                    doi:10.1016/j.neuroimage.2008.10.040
+    .. footbibliography::
     """
     cdef:
         cnp.npy_intp nr = delta_field.shape[0]
@@ -428,7 +428,7 @@ def compute_em_demons_step_2d(floating[:,:] delta_field,
                 else:
                     nrm2 = (gradient_moving[i, j, 0]**2 +
                             gradient_moving[i, j, 1]**2)
-                    if(sigma_sq_i == 0):
+                    if sigma_sq_i == 0:
                         if nrm2 == 0:
                             out[i, j, 0], out[i, j, 1] = 0, 0
                         else:
@@ -441,7 +441,7 @@ def compute_em_demons_step_2d(floating[:,:] delta_field,
                         prod = sigma_sq_x * delta
                         out[i, j, 0] = prod * gradient_moving[i, j, 0] / den
                         out[i, j, 1] = prod * gradient_moving[i, j, 1] / den
-    return out, energy
+    return np.asarray(out), energy
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -453,17 +453,18 @@ def compute_em_demons_step_3d(floating[:,:,:] delta_field,
                               floating[:,:,:,:] out):
     r"""Demons step for EM metric in 3D
 
-    Computes the demons step [Vercauteren09] for SSD-driven registration
-    ( eq. 4 in [Vercauteren09] ) using the EM algorithm [Arce14] to handle
-    multi-modality images.
+    Computes the demons step :footcite:p:`Vercauteren2009` for SSD-driven
+    registration ( eq. 4 in :footcite:p:`Vercauteren2009` ) using the EM
+    algorithm :footcite:p:`ArceSantana2014` to handle multi-modality images.
 
-    In this case, $\sigma_i$ in eq. 4 of [Vercauteren09] is estimated using
-    the EM algorithm, while in the original version of diffeomorphic demons
-    it is estimated by the difference between the image values at each pixel.
+    In this case, $\sigma_i$ in eq. 4 of :footcite:p:`Vercauteren2009` is
+    estimated using the EM algorithm, while in the original version of
+    diffeomorphic demons it is estimated by the difference between the image
+    values at each pixel.
 
     Parameters
     ----------
-    delta_field : array, shape(S, R, C)
+    delta_field : array, shape (S, R, C)
         contains, at each pixel, the difference between the moving image (warped
         under the current deformation s ) J and the static image I:
         delta_field[k,i,j] = J(s(k,i,j)) - I(k,i,j). The order is important,
@@ -471,16 +472,16 @@ def compute_em_demons_step_3d(floating[:,:,:] delta_field,
         backward demons step warping the static image towards the moving, which
         may not be the intended behavior unless the 'gradient_moving' passed
         corresponds to the gradient of the static image
-    sigma_sq_field : array, shape(S, R, C)
+    sigma_sq_field : array, shape (S, R, C)
         contains, at each pixel (k, i, j), the estimated variance (not std) of
         the hidden variable associated to the intensity at static[k,i,j] (which
         must have been previously quantized)
-    gradient_moving : array, shape(S, R, C, 2)
+    gradient_moving : array, shape (S, R, C, 2)
         the gradient of the moving image
     sigma_sq_x : float
         parameter controlling the amount of regularization. It corresponds to
-        $\sigma_x^2$ in algorithm 1 of Vercauteren et al.[2].
-    out : array, shape(S, R, C, 2)
+        $\sigma_x^2$ in algorithm 1 of footcite:p:`Vercauteren2009`.
+    out : array, shape (S, R, C, 2)
         the resulting demons step will be written to this array
 
     Returns
@@ -493,14 +494,7 @@ def compute_em_demons_step_3d(floating[:,:,:] delta_field,
 
     References
     ----------
-    [Arce14] Arce-santana, E., Campos-delgado, D. U., & Vigueras-g, F. (2014).
-             Non-rigid Multimodal Image Registration Based on the
-             Expectation-Maximization Algorithm, (168140), 36-47.
-
-    [Vercauteren09] Vercauteren, T., Pennec, X., Perchant, A., & Ayache, N.
-                    (2009). Diffeomorphic demons: efficient non-parametric
-                    image registration. NeuroImage, 45(1 Suppl), S61-72.
-                    doi:10.1016/j.neuroimage.2008.10.040
+    .. footbibliography::
     """
     cdef:
         cnp.npy_intp ns = delta_field.shape[0]
@@ -529,7 +523,7 @@ def compute_em_demons_step_3d(floating[:,:,:] delta_field,
                         nrm2 = (gradient_moving[k, i, j, 0]**2 +
                                 gradient_moving[k, i, j, 1]**2 +
                                 gradient_moving[k, i, j, 2]**2)
-                        if(sigma_sq_i == 0):
+                        if sigma_sq_i == 0:
                             if nrm2 == 0:
                                 out[k, i, j, 0] = 0
                                 out[k, i, j, 1] = 0
@@ -549,4 +543,4 @@ def compute_em_demons_step_3d(floating[:,:,:] delta_field,
                                 gradient_moving[k, i, j, 1] / den)
                             out[k, i, j, 2] = (sigma_sq_x * delta *
                                 gradient_moving[k, i, j, 2] / den)
-    return out, energy
+    return np.asarray(out), energy

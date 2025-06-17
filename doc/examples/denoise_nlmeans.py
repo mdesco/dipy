@@ -3,83 +3,88 @@
 Denoise images using Non-Local Means (NLMEANS)
 ==============================================
 
-Using the non-local means filter [Coupe2008]_ you can denoise 3D or 4D images and
-boost the SNR of your datasets. You can also decide between modeling the noise
-as Gaussian or Rician (default).
+Using the non-local means filter :footcite:p:`Coupe2008` and
+:footcite:p:`Coupe2012` and you can denoise 3D or 4D images and boost the SNR of
+your datasets. You can also decide between modeling the noise as Gaussian or
+Rician (default).
 
+We start by loading the necessary modules
 """
 
-import numpy as np
 from time import time
-import nibabel as nib
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from dipy.data import get_fnames
 from dipy.denoise.nlmeans import nlmeans
-from dipy.data import fetch_sherbrooke_3shell, read_sherbrooke_3shell
+from dipy.denoise.noise_estimate import estimate_sigma
+from dipy.io.image import load_nifti, save_nifti
 
+###############################################################################
+# Then, let's fetch and load a T1 data from Stanford University
 
-fetch_sherbrooke_3shell()
-img, gtab = read_sherbrooke_3shell()
+t1_fname = get_fnames(name="stanford_t1")
+data, affine = load_nifti(t1_fname)
 
-data = img.get_data()
-aff = img.get_affine()
-
-mask = data[..., 0] > 80
-
-data = data[..., 0]
+mask = data > 1500
 
 print("vol size", data.shape)
 
+###############################################################################
+# In order to call ``non_local_means`` first you need to estimate the standard
+# deviation of the noise. We have used N=32 since the Stanford dataset was
+# acquired on a 3T GE scanner with a 32 array head coil.
+
+sigma = estimate_sigma(data, N=32)
+
+###############################################################################
+# Calling the main function ``non_local_means``
+
 t = time()
 
-"""
-In order to call ``nlmeans`` first you need to estimate the standard deviation
-of the noise.
-"""
-
-sigma = np.std(data[~mask])
-
-den = nlmeans(data, sigma=sigma, mask=mask)
+den = nlmeans(data, sigma=sigma, mask=mask, patch_radius=1, block_radius=2, rician=True)
 
 print("total time", time() - t)
-print("vol size", den.shape)
 
-import matplotlib.pyplot as plt
+###############################################################################
+# Let us plot the axial slice of the denoised output
 
-axial_middle = data.shape[2] / 2
+axial_middle = data.shape[2] // 2
 
 before = data[:, :, axial_middle].T
 after = den[:, :, axial_middle].T
-difference = np.abs(after.astype('f8') - before.astype('f8'))
+
+difference = np.abs(after.astype(np.float64) - before.astype(np.float64))
+
 difference[~mask[:, :, axial_middle].T] = 0
 
+
 fig, ax = plt.subplots(1, 3)
-ax[0].imshow(before, cmap='gray', origin='lower')
-ax[0].set_title('before')
-ax[1].imshow(after, cmap='gray', origin='lower')
-ax[1].set_title('after')
-ax[2].imshow(difference, cmap='gray', origin='lower')
-ax[2].set_title('difference')
-for i in range(3):
-    ax[i].set_axis_off()
+ax[0].imshow(before, cmap="gray", origin="lower")
+ax[0].set_title("before")
+ax[1].imshow(after, cmap="gray", origin="lower")
+ax[1].set_title("after")
+ax[2].imshow(difference, cmap="gray", origin="lower")
+ax[2].set_title("difference")
 
-plt.show()
-plt.savefig('denoised_S0.png', bbox_inches='tight')
+plt.savefig("denoised.png", bbox_inches="tight")
 
-"""
-.. figure:: denoised_S0.png
-   :align: center
+###############################################################################
+# .. rst-class:: centered small fst-italic fw-semibold
+#
+# Showing axial slice before (left) and after (right) NLMEANS denoising
 
-   **Showing the middle axial slice without (left) and with (right) NLMEANS denoising**.
-"""
+save_nifti("denoised.nii.gz", den, affine)
 
-nib.save(nib.Nifti1Image(den, aff), 'denoised.nii.gz')
-
-"""
-
-.. [Coupe2008] P. Coupe, P. Yger, S. Prima, P. Hellier, C. Kervrann, C. Barillot,
-   "An Optimized Blockwise Non Local Means Denoising Filter for 3D Magnetic
-   Resonance Images", IEEE Transactions on Medical Imaging, 27(4):425-441, 2008.
-
-.. include:: ../links_names.inc
-
-
-"""
+###############################################################################
+# An improved version of non-local means denoising is adaptive soft coefficient
+# matching, please refer to
+# :ref:`sphx_glr_examples_built_preprocessing_denoise_ascm.py` for more
+# details.
+#
+# References
+# ----------
+#
+# .. footbibliography::
+#

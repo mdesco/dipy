@@ -1,8 +1,6 @@
 # Init for tracking module
-""" Tracking objects """
+"""Tracking objects"""
 
-# Test callable
-from numpy.testing import Tester
-test = Tester().test
-bench = Tester().bench
-del Tester
+from nibabel.streamlines import ArraySequence as Streamlines
+
+__all__ = ["Streamlines"]

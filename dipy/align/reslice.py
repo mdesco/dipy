@@ -1,9 +1,24 @@
+import multiprocessing as mp
+import warnings
+
 import numpy as np
 from scipy.ndimage import affine_transform
 
+from dipy.testing.decorators import warning_for_keywords
+from dipy.utils.multiproc import determine_num_processes
 
-def reslice(data, affine, zooms, new_zooms, order=1, mode='constant', cval=0):
-    """Reslice data with new voxel resolution defined by ``new_zooms``
+
+def _affine_transform(kwargs):
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*scipy.*18.*", category=UserWarning)
+        return affine_transform(**kwargs)
+
+
+@warning_for_keywords()
+def reslice(
+    data, affine, zooms, new_zooms, *, order=1, mode="constant", cval=0, num_processes=1
+):
+    """Reslice data with new voxel resolution defined by ``new_zooms``.
 
     Parameters
     ----------
@@ -25,6 +40,11 @@ def reslice(data, affine, zooms, new_zooms, order=1, mode='constant', cval=0):
     cval : float
         Value used for points outside the boundaries of the input if
         mode='constant'.
+    num_processes : int, optional
+        Split the calculation to a pool of children processes. This only
+        applies to 4D `data` arrays. Default is 1. If < 0 the maximal number
+        of cores minus ``num_processes + 1`` is used (enter -1 to use as many
+        cores as possible). 0 raises an error.
 
     Returns
     -------
@@ -35,45 +55,66 @@ def reslice(data, affine, zooms, new_zooms, order=1, mode='constant', cval=0):
 
     Examples
     --------
-    >>> import nibabel as nib
+    >>> from dipy.io.image import load_nifti
     >>> from dipy.align.reslice import reslice
-    >>> from dipy.data import get_data
-    >>> fimg = get_data('aniso_vox')
-    >>> img = nib.load(fimg)
-    >>> data = img.get_data()
-    >>> data.shape
-    (58, 58, 24)
-    >>> affine = img.get_affine()
-    >>> zooms = img.get_header().get_zooms()[:3]
+    >>> from dipy.data import get_fnames
+    >>> f_name = get_fnames(name="aniso_vox")
+    >>> data, affine, zooms = load_nifti(f_name, return_voxsize=True)
+    >>> data.shape == (58, 58, 24)
+    True
     >>> zooms
     (4.0, 4.0, 5.0)
     >>> new_zooms = (3.,3.,3.)
     >>> new_zooms
     (3.0, 3.0, 3.0)
     >>> data2, affine2 = reslice(data, affine, zooms, new_zooms)
-    >>> data2.shape
-    (77, 77, 40)
-    """
-    R = np.diag(np.array(new_zooms)/np.array(zooms))
-    new_shape = np.array(zooms)/np.array(new_zooms) * np.array(data.shape[:3])
-    new_shape = np.round(new_shape).astype('i8')
-    if data.ndim == 3:
-        data2 = affine_transform(input=data, matrix=R, offset=np.zeros(3,),
-                                 output_shape=tuple(new_shape),
-                                 order=order, mode=mode, cval=cval)
-    if data.ndim == 4:
-        data2l=[]
-        for i in range(data.shape[-1]):
-            tmp = affine_transform(input=data[..., i], matrix=R,
-                                   offset=np.zeros(3,),
-                                   output_shape=tuple(new_shape),
-                                   order=order, mode=mode, cval=cval)
-            data2l.append(tmp)
-        data2 = np.zeros(tmp.shape+(data.shape[-1],), data.dtype)
-        for i in range(data.shape[-1]):
-            data2[..., i] = data2l[i]
+    >>> data2.shape == (77, 77, 40)
+    True
 
-    Rx = np.eye(4)
-    Rx[:3, :3] = R
-    affine2 = np.dot(affine, Rx)
-    return data2, affine2
+    """
+    num_processes = determine_num_processes(num_processes)
+
+    # We are suppressing warnings emitted by scipy >= 0.18,
+    # described in https://github.com/dipy/dipy/issues/1107.
+    # These warnings are not relevant to us, as long as our offset
+    # input to scipy's affine_transform is [0, 0, 0]
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=".*scipy.*18.*", category=UserWarning)
+        new_zooms = np.array(new_zooms, dtype="f8")
+        zooms = np.array(zooms, dtype="f8")
+        R = new_zooms / zooms
+        new_shape = zooms / new_zooms * np.array(data.shape[:3])
+        new_shape = tuple(np.round(new_shape).astype("i8"))
+        kwargs = {
+            "matrix": R,
+            "output_shape": new_shape,
+            "order": order,
+            "mode": mode,
+            "cval": cval,
+        }
+        if data.ndim == 3:
+            data2 = affine_transform(input=data, **kwargs)
+        elif data.ndim == 4:
+            data2 = np.zeros(new_shape + (data.shape[-1],), data.dtype)
+            if num_processes == 1:
+                for i in range(data.shape[-1]):
+                    affine_transform(input=data[..., i], output=data2[..., i], **kwargs)
+            else:
+                params = []
+                for i in range(data.shape[-1]):
+                    _kwargs = {"input": data[..., i]}
+                    _kwargs.update(kwargs)
+                    params.append(_kwargs)
+                mp.set_start_method("spawn", force=True)
+                pool = mp.Pool(num_processes)
+                for i, res in enumerate(pool.imap(_affine_transform, params)):
+                    data2[..., i] = res
+                pool.close()
+        else:
+            raise ValueError(
+                f"dimension of data should be 3 or 4 but you provided {data.ndim}"
+            )
+        Rx = np.eye(4)
+        Rx[:3, :3] = np.diag(R)
+        affine2 = np.dot(affine, Rx)
+    return (data2, affine2)

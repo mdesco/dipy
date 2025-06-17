@@ -1,10 +1,9 @@
 {% extends "!layout.html" %}
-{% set title = 'Dipy' %}
 
 {% block rootrellink %}
   <li><a href="{{pathto('index')}}">Home</a> |&nbsp;</li>
   <li><a href="{{pathto('stateoftheart')}}">Overview</a> |&nbsp;</li>
-  <li><a href="{{pathto('examples_index')}}">Gallery</a> |&nbsp;</li>
+  <li><a href="{{pathto('examples_built/index')}}">Gallery</a> |&nbsp;</li>
   <li><a href="{{pathto('installation')}}">Download</a> |&nbsp;</li>
   <li><a href="{{pathto('subscribe')}}">Subscribe</a> |&nbsp;</li>
   <li><a href="{{pathto('developers')}}">Developers</a> |&nbsp;</li>
@@ -13,22 +12,17 @@
 
 
 {% block extrahead %}
-  <meta name="keywords" content="dipy, dMRI, DTI, DSI, diffusion MRI, Tensor,
+  <meta name="keywords" content="DIPY, dMRI, DTI, DSI, diffusion MRI, Tensor,
   neuroimaging, python, neuroscience, Eleftherios, Garyfallidis, tractography,
   streamlines, fiber tracking">
 {% endblock %}
 
-{% block header %}
-<div style="background-color: white; text-align: left; padding: 10px 10px 15px 15px">
- <a href="{{pathto('index') }}">
-  <img src="{{ pathto("_static/dipy-banner.png", 1) }}" alt="dipy logo"  border="0" />
-</div>
-{% endblock %}
+
 
 {# This block gets put at the top of the sidebar #}
 {% block sidebarlogo %}
 
-  
+
 <h4> Site Navigation </h4>
   <ul>
     <li><a href="{{pathto('documentation')}}">Documentation</a></li>
@@ -38,13 +32,13 @@
 <h4> NIPY Community </h4>
   <ul class="simple">
     <li><a class="reference external"
-	href="http://nipy.org/">Community Home</a></li>
+	href="https://nipy.org/">Community Home</a></li>
     <li><a class="reference external"
-	href="http://nipy.org/software/projects/">NIPY Projects</a></li>
+	href="https://nipy.org/">NIPY Projects</a></li>
     <li><a class="reference external"
-	href="http://mail.scipy.org/mailman/listinfo/nipy-devel">Mailing List</a></li>
+	href="https://mail.python.org/mailman/listinfo/neuroimaging">Mailing List</a></li>
     <li><a class="reference external"
-	href="http://nipy.org/software/license/index.html">License</a></li>
+	href="https://nipy.org/nipy/license.html">License</a></li>
   </ul>
 
 {% endblock %}
@@ -59,7 +53,7 @@
   <script type="text/javascript">
     function mlsearch(curobj)
     {
-    curobj.q.value="site:mail.scipy.org/pipermail/nipy-devel/ "+curobj.userquery.value
+    curobj.q.value="site:mail.python.org/pipermail/neuroimaging/ "+curobj.userquery.value
     }
   </script>
   <form action="http://www.google.com/search" method="get" onSubmit="mlsearch(this)">
@@ -67,7 +61,7 @@
     <input name="q" type="hidden" />
   </form>
 </div>
-  
+
 <div id="searchbox-site" style="display: none">
   <h3>{{ _('Search this site') }}</h3>
     <form class="search" action="{{ pathto('search') }}" method="get">
@@ -87,5 +81,11 @@
    macro, so the only way to add something to the bottom of the sidebar is to
    put it here, at the end of the sidebarsearch block (before it closes).
    #}
+<script>
+     ((window.gitter = {}).chat = {}).options = {
+       room: 'dipy/dipy'
+     };
+</script>
+<script src="https://sidecar.gitter.im/dist/sidecar.v1.js" async defer></script>
 
 {%- endblock %}
